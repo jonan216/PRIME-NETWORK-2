@@ -1,9 +1,11 @@
 import { Router } from 'express'
-import crypto from 'crypto'
-import { marzConfig, getMarzAuthHeaders, formatPhone, initiateCollectMoney, initiateDisburse, getTransactionStatus } from '../lib/marz.js'
 import axios from 'axios'
+import crypto from 'crypto'
+import { marzConfig, getMarzAuthHeaders, formatPhone } from '../lib/marz.js'
 
 export const marzRouter = Router()
+
+const isValidUuid = (str) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
 
 // ---------------------------------------------------------------------------
 // POST /api/marz/collect-money  — Deposit (collect from user's MoMo/Airtel)
@@ -17,9 +19,9 @@ marzRouter.post('/collect-money', async (req, res) => {
     }
 
     const ugxAmount = Math.round(parseFloat(amount))
-    const reference_ = reference || `PRIME-${Date.now()}`
+    const reference_ = isValidUuid(reference) ? reference : crypto.randomUUID()
 
-    const response = await axios.post(`${marzConfig.baseUrl}/collect-money`, {
+    const payload = {
       amount: ugxAmount,
       currency: 'UGX',
       country: 'UG',
@@ -28,7 +30,11 @@ marzRouter.post('/collect-money', async (req, res) => {
       reference: reference_,
       callback_url: marzConfig.callbackUrl,
       user_id,
-    }, { headers: getMarzAuthHeaders() })
+    }
+
+    const response = await axios.post(`${marzConfig.baseUrl}/collect-money`, payload, {
+      headers: getMarzAuthHeaders(),
+    })
 
     return res.status(200).json({
       status: 'initiated',
@@ -37,10 +43,12 @@ marzRouter.post('/collect-money', async (req, res) => {
       ugxAmount,
     })
   } catch (error) {
-    console.error('[MARZ] collect-money error', error.response?.data || error.message)
+    const errData = error.response?.data || {}
+    console.error('[MARZ] collect-money error', errData || error.message)
+
     return res.status(500).json({
-      message: 'Failed to initiate payment',
-      details: error.response?.data || error.message,
+      message: errData.message || 'Failed to initiate payment',
+      details: errData,
     })
   }
 })
@@ -57,9 +65,9 @@ marzRouter.post('/disburse', async (req, res) => {
     }
 
     const ugxAmount = Math.round(parseFloat(amount))
-    const reference_ = reference || `PRIME-WD-${Date.now()}`
+    const reference_ = isValidUuid(reference) ? reference : crypto.randomUUID()
 
-    const response = await axios.post(`${marzConfig.baseUrl}/send-money`, {
+    const payload = {
       amount: ugxAmount,
       currency: 'UGX',
       country: 'UG',
@@ -68,7 +76,11 @@ marzRouter.post('/disburse', async (req, res) => {
       reference: reference_,
       callback_url: marzConfig.callbackUrl,
       user_id,
-    }, { headers: getMarzAuthHeaders() })
+    }
+
+    const response = await axios.post(`${marzConfig.baseUrl}/send-money`, payload, {
+      headers: getMarzAuthHeaders(),
+    })
 
     return res.status(200).json({
       status: 'initiated',
@@ -77,10 +89,17 @@ marzRouter.post('/disburse', async (req, res) => {
       ugxAmount,
     })
   } catch (error) {
-    console.error('[MARZ] disburse error', error.response?.data || error.message)
+    const errData = error.response?.data || {}
+    console.error('[MARZ] disburse error', errData || error.message)
+
+    let message = errData.message || 'Failed to initiate withdrawal'
+    if (errData.error_code === 'IP_WHITELIST_REQUIRED') {
+      message = 'Disbursement requires server IP whitelisting on Marz Innovations Dashboard. Please contact support or whitelist server IP.'
+    }
+
     return res.status(500).json({
-      message: 'Failed to initiate withdrawal',
-      details: error.response?.data || error.message,
+      message,
+      details: errData,
     })
   }
 })
@@ -107,18 +126,14 @@ marzRouter.get('/transaction/:reference', async (req, res) => {
 
 // ---------------------------------------------------------------------------
 // POST /api/marz/webhook  — Marz Innovations payment callback
-//
-// IMPORTANT: This route uses rawBody (set in server/index.js) to compute
-// HMAC-SHA256 over the exact bytes received, before JSON parsing mutates them.
 // ---------------------------------------------------------------------------
-marzRouter.post('/webhook', (req, res) => {
+marzRouter.post(['/webhook', '/'], (req, res) => {
   try {
     const signature = req.headers['x-marz-signature'] || ''
 
-    // Use the raw buffer captured before express.json() processed the body
     const rawBody = req.rawBody
     if (!rawBody) {
-      console.error('[MARZ] rawBody missing — check server middleware setup')
+      console.error('[MARZ] rawBody missing — middleware not configured correctly')
       return res.status(500).json({ message: 'Server misconfiguration: rawBody unavailable' })
     }
 
@@ -134,9 +149,6 @@ marzRouter.post('/webhook', (req, res) => {
 
     const event = req.body
     console.log('[MARZ] webhook event received', event.reference || event.transaction_id, '| status:', event.status)
-
-    // TODO: update transaction status in your database here based on event.status
-    // e.g. if (event.status === 'credited') { ... credit user wallet ... }
 
     return res.status(200).json({ received: true })
   } catch (error) {
