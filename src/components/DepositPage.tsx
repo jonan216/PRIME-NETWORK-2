@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { ShieldCheck, Wallet, Building2, CreditCard, ArrowRight, Loader2, CheckCircle2, Clock, XCircle } from 'lucide-react'
 import { initiateDeposit, getTransactionStatus } from '../lib/marzApi'
+import { useAuth } from '../context/AuthContext'
 
 type PaymentStatus = 'idle' | 'pending' | 'waiting' | 'completed' | 'failed'
 
 export default function DepositPage() {
+  const { user } = useAuth()
   const [amount, setAmount] = useState('')
   const [provider, setProvider] = useState<'mtn_momo' | 'airtel_money' | 'visa' | 'mastercard' | 'bank_transfer'>('mtn_momo')
   const [phone, setPhone] = useState('')
@@ -22,8 +24,7 @@ export default function DepositPage() {
 
   const selectedProvider = providers.find(p => p.value === provider)
 
-  const UGX_TO_USD_RATE = 3700
-  const usdAmount = amount ? (parseFloat(amount) / UGX_TO_USD_RATE).toFixed(2) : '0.00'
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,14 +32,14 @@ export default function DepositPage() {
     setStatus('pending')
 
     try {
-      const usdValue = parseFloat(amount) / UGX_TO_USD_RATE
+      const ugxValue = parseFloat(amount)
       const result = await initiateDeposit({
-        amount: usdValue,
-        currency: 'USD',
+        amount: ugxValue,
+        currency: 'UGX',
         phone,
         provider,
         reference: `DEP-${Date.now()}`,
-        user_id: '1',
+        user_id: user?.id ?? 'guest',
       })
 
       if (result.data?.status === 'success' || result.data?.message?.includes('Sandbox Mode')) {
@@ -111,12 +112,7 @@ export default function DepositPage() {
                       className="w-full pl-14 pr-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
                     />
                   </div>
-                  <p className="text-xs text-text-secondary mt-1">Minimum deposit: UGX 18,500 (~${usdAmount})</p>
-                  {amount && parseFloat(amount) >= 18500 && (
-                    <p className="text-xs text-accent mt-1 font-medium">
-                      You will receive: ${usdAmount}
-                    </p>
-                  )}
+                  <p className="text-xs text-text-secondary mt-1">Minimum deposit: UGX 18,500</p>
                 </div>
 
                 <div>

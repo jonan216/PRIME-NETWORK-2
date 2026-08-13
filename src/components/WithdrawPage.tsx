@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ArrowUpRight, Wallet, Building2, History, Loader2, CheckCircle2, Clock, XCircle } from 'lucide-react'
 import { initiateWithdrawal, getTransactionStatus } from '../lib/marzApi'
+import { useAuth } from '../context/AuthContext'
 
 type PaymentStatus = 'idle' | 'pending' | 'waiting' | 'completed' | 'failed'
 
@@ -19,6 +20,7 @@ const mockWithdrawals: Withdrawal[] = [
 ]
 
 export default function WithdrawPage() {
+  const { user } = useAuth()
   const [amount, setAmount] = useState('')
   const [provider, setProvider] = useState<'mtn_momo' | 'airtel_money' | 'bank_transfer'>('mtn_momo')
   const [phone, setPhone] = useState('')
@@ -44,7 +46,7 @@ export default function WithdrawPage() {
         phone,
         provider,
         reference: `WD-${Date.now()}`,
-        user_id: '1',
+        user_id: user?.id ?? 'guest',
       })
 
       setStatus('waiting')
@@ -106,18 +108,18 @@ export default function WithdrawPage() {
                   <div>
                     <label className="block text-sm font-medium text-text-primary mb-2">Amount</label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary">$</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary">UGX</span>
                       <input
                         type="number"
                         value={amount}
                         onChange={e => setAmount(e.target.value)}
-                        placeholder="0.00"
+                        placeholder="0"
                         required
-                      min={10}
-                      className="w-full pl-8 pr-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
+                      min={18500}
+                      className="w-full pl-14 pr-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
                     />
                   </div>
-                  <p className="text-xs text-text-secondary mt-1">Minimum withdrawal: $10.00</p>
+                  <p className="text-xs text-text-secondary mt-1">Minimum withdrawal: UGX 18,500</p>
                   </div>
 
                   <div>
