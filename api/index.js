@@ -13,7 +13,6 @@ app.use((req, res, next) => {
     if (err) return next(err)
     if (Buffer.isBuffer(req.body)) {
       req.rawBody = req.body.toString('utf8')
-      // Re-parse as JSON for the rest of the routes
       try {
         req.body = JSON.parse(req.rawBody)
       } catch {
@@ -26,8 +25,8 @@ app.use((req, res, next) => {
 
 app.use(express.json())
 
-// Vercel strips the /api prefix before invoking this function,
-// so mount routes at / (not /api)
+// Mount at both /api and / to handle Vercel rewrites seamlessly
+app.use('/api', apiRouter)
 app.use('/', apiRouter)
 
 export default app

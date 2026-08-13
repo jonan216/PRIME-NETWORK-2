@@ -121,7 +121,7 @@ marzRouter.get('/transaction/:reference', async (req, res) => {
 // Uses req.rawBody (set in api/index.js) to compute HMAC-SHA256 over the
 // exact bytes received — before JSON parsing can alter them.
 // ---------------------------------------------------------------------------
-marzRouter.post('/webhook', (req, res) => {
+marzRouter.post(['/webhook', '/'], (req, res) => {
   try {
     const signature = req.headers['x-marz-signature'] || ''
 
