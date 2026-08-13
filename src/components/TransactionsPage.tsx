@@ -10,16 +10,7 @@ interface Transaction {
   timestamp: string
 }
 
-const transactions: Transaction[] = [
-  { id: '1', type: 'deposit', description: 'Deposit via MTN Mobile Money', amount: 2000, status: 'completed', timestamp: '2026-08-12 09:22:28' },
-  { id: '2', type: 'earning', description: 'Investment Return - Growth Plan', amount: 350, status: 'completed', timestamp: '2026-08-12 08:15:00' },
-  { id: '3', type: 'withdrawal', description: 'Withdrawal to Bank Account', amount: 500, status: 'completed', timestamp: '2026-08-11 16:45:00' },
-  { id: '4', type: 'referral_reward', description: 'Referral Commission - Sarah M.', amount: 120, status: 'completed', timestamp: '2026-08-11 12:30:00' },
-  { id: '5', type: 'investment', description: 'Investment in Premium Plan', amount: 2500, status: 'completed', timestamp: '2026-08-10 14:20:00' },
-  { id: '6', type: 'deposit', description: 'Deposit via Bank Transfer', amount: 1000, status: 'pending', timestamp: '2026-08-10 10:00:00' },
-  { id: '7', type: 'transfer_out', description: 'Transfer to friend', amount: 300, status: 'completed', timestamp: '2026-08-09 18:30:00' },
-  { id: '8', type: 'transfer_in', description: 'Transfer received from David', amount: 500, status: 'completed', timestamp: '2026-08-09 14:20:00' },
-]
+const transactions: Transaction[] = []
 
 export default function TransactionsPage() {
   const [filter, setFilter] = useState('all')

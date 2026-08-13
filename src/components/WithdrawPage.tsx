@@ -13,11 +13,7 @@ interface Withdrawal {
   status: 'completed' | 'pending' | 'processing'
 }
 
-const mockWithdrawals: Withdrawal[] = [
-  { id: '1', date: '2026-08-05', method: 'MTN Mobile Money', amount: 1500.00, status: 'completed' },
-  { id: '2', date: '2026-08-02', method: 'Bank Transfer', amount: 800.00, status: 'processing' },
-  { id: '3', date: '2026-07-28', method: 'Airtel Money', amount: 2200.00, status: 'completed' },
-]
+const mockWithdrawals: Withdrawal[] = []
 
 export default function WithdrawPage() {
   const { user } = useAuth()

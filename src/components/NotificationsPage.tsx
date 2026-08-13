@@ -10,16 +10,7 @@ interface Notification {
   read: boolean
 }
 
-const mockNotifications: Notification[] = [
-  { id: '1', type: 'investment', title: 'Investment Plan Activated', message: 'Your Gold Plan investment of $5,000 has been activated successfully.', timestamp: '2 hours ago', read: false },
-  { id: '2', type: 'system', title: 'Account Verification Complete', message: 'Your identity verification has been approved. You now have full access to all features.', timestamp: '5 hours ago', read: false },
-  { id: '3', type: 'investment', title: 'Dividend Received', message: 'You received a dividend payout of $1,245.50 from your portfolio.', timestamp: '1 day ago', read: true },
-  { id: '4', type: 'system', title: 'Security Alert', message: 'A new login was detected from Windows device. If this was you, no action is needed.', timestamp: '1 day ago', read: true },
-  { id: '5', type: 'investment', title: 'Plan Matured', message: 'Your Silver Plan has matured. The principal plus returns are now available in your wallet.', timestamp: '2 days ago', read: true },
-  { id: '6', type: 'system', title: 'Withdrawal Processed', message: 'Your withdrawal request of $1,500 has been processed and sent to your bank.', timestamp: '3 days ago', read: true },
-  { id: '7', type: 'investment', title: 'New Investment Opportunity', message: 'A new Real Estate Fund is now available for investment. Minimum entry: $10,000.', timestamp: '4 days ago', read: true },
-  { id: '8', type: 'system', title: 'Profile Update', message: 'Your account settings have been updated successfully.', timestamp: '5 days ago', read: true },
-]
+const mockNotifications: Notification[] = []
 
 const notificationTabs = ['All', 'Unread', 'System', 'Investment'] as const
 type NotificationTab = typeof notificationTabs[number]

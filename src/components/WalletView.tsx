@@ -9,19 +9,13 @@ interface Transaction {
   status: 'Completed' | 'Pending'
 }
 
-const mockTransactions: Transaction[] = [
-  { id: '1', date: '2026-08-10', type: 'Deposit', amount: 2000, status: 'Completed' },
-  { id: '2', date: '2026-08-09', type: 'Return', amount: 350, status: 'Completed' },
-  { id: '3', date: '2026-08-08', type: 'Withdrawal', amount: 500, status: 'Pending' },
-  { id: '4', date: '2026-08-07', type: 'Investment', amount: 2500, status: 'Completed' },
-  { id: '5', date: '2026-08-06', type: 'Deposit', amount: 1000, status: 'Completed' }
-]
+const mockTransactions: Transaction[] = []
 
 const balanceCards = [
-  { label: 'Available Balance', value: 4380, icon: Wallet },
-  { label: 'Invested', value: 12500, icon: TrendingUp },
-  { label: 'Earnings', value: 3512.5, icon: CircleDollarSign },
-  { label: 'Withdrawable Balance', value: 4380, icon: ArrowDownToLine }
+  { label: 'Available Balance', value: 0, icon: Wallet },
+  { label: 'Invested', value: 0, icon: TrendingUp },
+  { label: 'Earnings', value: 0, icon: CircleDollarSign },
+  { label: 'Withdrawable Balance', value: 0, icon: ArrowDownToLine }
 ]
 
 export default function WalletView() {
@@ -38,7 +32,7 @@ export default function WalletView() {
 
         <div className="bg-cream-card rounded-cream-lg border border-cream-border p-8 shadow-cream-lg mb-6">
           <p className="text-text-secondary text-sm mb-2">Available Balance</p>
-          <p className="text-4xl md:text-5xl font-bold text-accent">$4,380.00</p>
+          <p className="text-4xl md:text-5xl font-bold text-accent">$0.00</p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
@@ -99,6 +93,9 @@ export default function WalletView() {
                   ))}
                 </tbody>
               </table>
+              {mockTransactions.length === 0 && (
+                <p className="text-sm text-text-secondary text-center py-8">No wallet transactions found</p>
+              )}
             </div>
           </div>
         </div>

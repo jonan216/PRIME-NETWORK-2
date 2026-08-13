@@ -11,12 +11,7 @@ interface TeamMember {
   yourEarnings: number
 }
 
-const teamMembers: TeamMember[] = [
-  { id: '1', name: 'Sarah M.', email: 'sarah@example.com', joinedAt: '2026-08-01', status: 'active', investments: 5000, yourEarnings: 250 },
-  { id: '2', name: 'David K.', email: 'david@example.com', joinedAt: '2026-07-28', status: 'active', investments: 3200, yourEarnings: 160 },
-  { id: '3', name: 'Emma R.', email: 'emma@example.com', joinedAt: '2026-07-25', status: 'inactive', investments: 1000, yourEarnings: 50 },
-  { id: '4', name: 'James T.', email: 'james@example.com', joinedAt: '2026-07-20', status: 'active', investments: 8500, yourEarnings: 425 },
-]
+const teamMembers: TeamMember[] = []
 
 export default function TeamPage() {
   const [copied, setCopied] = useState(false)

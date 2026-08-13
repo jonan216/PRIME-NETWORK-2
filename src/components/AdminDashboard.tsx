@@ -28,31 +28,26 @@ interface ProfitApproval {
   status: 'pending' | 'approved' | 'rejected'
 }
 
-const mockUsers: User[] = [
-  { id: '1', name: 'John Doe', email: 'john@example.com', joined: '2026-08-01', status: 'active', invested: 5000, earnings: 120 },
-  { id: '2', name: 'Jane Smith', email: 'jane@example.com', joined: '2026-08-03', status: 'active', invested: 10000, earnings: 240 },
-  { id: '3', name: 'Bob Johnson', email: 'bob@example.com', joined: '2026-08-05', status: 'pending', invested: 0, earnings: 0 },
-  { id: '4', name: 'Alice Brown', email: 'alice@example.com', joined: '2026-08-06', status: 'active', invested: 2500, earnings: 60 },
+const initialUsers: User[] = [
+  {
+    id: 'admin-1',
+    name: 'PRIME NETWORK ADMINISTRATOR',
+    email: 'primeadministratorwealth@gmail.com',
+    joined: '2026-08-01',
+    status: 'active',
+    invested: 0,
+    earnings: 0,
+  },
 ]
 
-const mockTransactions: Transaction[] = [
-  { id: '1', user: 'John Doe', type: 'deposit', amount: 2000, status: 'pending', date: '2026-08-12 09:22:28' },
-  { id: '2', user: 'Jane Smith', type: 'withdrawal', amount: 500, status: 'pending', date: '2026-08-12 10:15:00' },
-  { id: '3', user: 'Bob Johnson', type: 'investment', amount: 1000, status: 'pending', date: '2026-08-11 14:20:00' },
-  { id: '4', user: 'Alice Brown', type: 'deposit', amount: 500, status: 'approved', date: '2026-08-11 12:30:00' },
-]
-
-const mockProfits: ProfitApproval[] = [
-  { id: '1', user: 'John Doe', amount: 120, date: '2026-08-12', status: 'pending' },
-  { id: '2', user: 'Jane Smith', amount: 240, date: '2026-08-12', status: 'pending' },
-  { id: '3', user: 'Alice Brown', amount: 60, date: '2026-08-11', status: 'approved' },
-]
+const initialTransactions: Transaction[] = []
+const initialProfits: ProfitApproval[] = []
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview')
-  const [users, setUsers] = useState<User[]>(mockUsers)
-  const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions)
-  const [profits, setProfits] = useState<ProfitApproval[]>(mockProfits)
+  const [users, setUsers] = useState<User[]>(initialUsers)
+  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions)
+  const [profits, setProfits] = useState<ProfitApproval[]>(initialProfits)
   const [searchTerm, setSearchTerm] = useState('')
 
   const totalInvested = users.reduce((sum, u) => sum + u.invested, 0)
@@ -186,7 +181,7 @@ export default function AdminDashboard() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
-                <h2 className="text-lg font-semibold text-text-primary mb-4">Recent Users</h2>
+                <h2 className="text-lg font-semibold text-text-primary mb-4">System Users</h2>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
@@ -200,7 +195,7 @@ export default function AdminDashboard() {
                     <tbody className="divide-y divide-cream-border">
                       {filteredUsers.slice(0, 5).map(user => (
                         <tr key={user.id}>
-                          <td className="py-3 text-sm text-text-primary">{user.name}</td>
+                          <td className="py-3 text-sm text-text-primary font-medium">{user.name}</td>
                           <td className="py-3 text-sm text-text-secondary">{user.email}</td>
                           <td className="py-3">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -328,17 +323,19 @@ export default function AdminDashboard() {
                                 <CheckCircle2 size={16} />
                               </button>
                             )}
-                            <button
-                              onClick={() => {
-                                if (window.confirm(`Are you sure you want to delete ${user.name}?`)) {
-                                  deleteUser(user.id)
-                                }
-                              }}
-                              className="p-1.5 rounded-lg bg-status-error/10 text-status-error hover:bg-status-error/20 transition-colors"
-                              title="Delete User"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                            {user.email !== 'primeadministratorwealth@gmail.com' && (
+                              <button
+                                onClick={() => {
+                                  if (window.confirm(`Are you sure you want to delete ${user.name}?`)) {
+                                    deleteUser(user.id)
+                                  }
+                                }}
+                                className="p-1.5 rounded-lg bg-status-error/10 text-status-error hover:bg-status-error/20 transition-colors"
+                                title="Delete User"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -416,6 +413,9 @@ export default function AdminDashboard() {
                     ))}
                   </tbody>
                 </table>
+                {transactions.length === 0 && (
+                  <p className="text-sm text-text-secondary text-center py-6">No transactions in system</p>
+                )}
               </div>
             </div>
           </div>
@@ -477,6 +477,9 @@ export default function AdminDashboard() {
                     ))}
                   </tbody>
                 </table>
+                {profits.length === 0 && (
+                  <p className="text-sm text-text-secondary text-center py-6">No profits pending approval</p>
+                )}
               </div>
             </div>
           </div>

@@ -13,17 +13,12 @@ export default function ReferralPage() {
   }
 
   const stats = [
-    { label: 'Total Referrals', value: '12', icon: Users },
-    { label: 'Active Referrals', value: '8', icon: Users },
-    { label: 'Total Earnings', value: '$1,240.00', icon: TrendingUp },
+    { label: 'Total Referrals', value: '0', icon: Users },
+    { label: 'Active Referrals', value: '0', icon: Users },
+    { label: 'Total Earnings', value: '$0.00', icon: TrendingUp },
   ]
 
-  const referrals = [
-    { name: 'Sarah M.', date: '2026-08-01', status: 'Active', earnings: '$320.00' },
-    { name: 'David K.', date: '2026-07-28', status: 'Active', earnings: '$280.00' },
-    { name: 'Emma R.', date: '2026-07-25', status: 'Pending', earnings: '$0.00' },
-    { name: 'James T.', date: '2026-07-20', status: 'Active', earnings: '$640.00' },
-  ]
+  const referrals: Array<{ name: string; date: string; status: string; earnings: string }> = []
 
   return (
     <div className="min-h-screen bg-cream-primary">

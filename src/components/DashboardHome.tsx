@@ -1,26 +1,15 @@
 import { NavLink } from 'react-router-dom'
-import { DollarSign, TrendingUp, Wallet, Users, ArrowDownToLine, ArrowUpFromLine, Plus } from 'lucide-react'
+import { DollarSign, TrendingUp, Wallet, Users, ArrowDownToLine, Plus } from 'lucide-react'
 
 const stats = [
-  { label: 'Available Balance', value: '$4,380.00', icon: Wallet, color: 'text-accent' },
-  { label: 'Total Invested', value: '$18,200.00', icon: TrendingUp, color: 'text-text-primary' },
-  { label: 'Total Daily Earnings', value: '$3,850.00', icon: DollarSign, color: 'text-status-success' },
-  { label: 'Referral Earnings', value: '$1,240.00', icon: Users, color: 'text-accent' },
+  { label: 'Available Balance', value: '$0.00', icon: Wallet, color: 'text-accent' },
+  { label: 'Total Invested', value: '$0.00', icon: TrendingUp, color: 'text-text-primary' },
+  { label: 'Total Daily Earnings', value: '$0.00', icon: DollarSign, color: 'text-status-success' },
+  { label: 'Referral Earnings', value: '$0.00', icon: Users, color: 'text-accent' },
 ]
 
-const recentActivity = [
-  { id: 1, title: 'Deposit Received', desc: '$2,000.00 via MTN Mobile Money', time: '2026-08-12 09:22:28', icon: ArrowDownToLine },
-  { id: 2, title: 'Daily Earnings', desc: '+$58.20 from all packages', time: '2026-08-12 08:15:00', icon: TrendingUp },
-  { id: 3, title: 'Withdrawal Processed', desc: '$500.00 to Bank Account', time: '2026-08-11 16:45:00', icon: ArrowUpFromLine },
-  { id: 4, title: 'Referral Commission', desc: '+$120.00 from team member', time: '2026-08-11 12:30:00', icon: Users },
-  { id: 5, title: 'New Investment', desc: '$2,500.00 in Premium Plan', time: '2026-08-10 14:20:00', icon: TrendingUp },
-]
-
-const activePackages = [
-  { id: 1, name: 'Starter Plan', rate: '1.2% Daily', invested: 50, earned: 0.60, status: 'active' },
-  { id: 2, name: 'Growth Plan', rate: '1.2% Daily', invested: 500, earned: 6.00, status: 'active' },
-  { id: 3, name: 'Premium Plan', rate: '1.2% Daily', invested: 5000, earned: 60.00, status: 'active' },
-]
+const recentActivity: Array<{ id: number; title: string; desc: string; time: string; icon: any }> = []
+const activePackages: Array<{ id: number; name: string; rate: string; invested: number; earned: number; status: string }> = []
 
 export default function DashboardHome() {
   return (
@@ -58,6 +47,9 @@ export default function DashboardHome() {
                 <span className="text-xs text-text-secondary flex-shrink-0">{activity.time}</span>
               </div>
             ))}
+            {recentActivity.length === 0 && (
+              <p className="text-sm text-text-secondary text-center py-8">No recent activity</p>
+            )}
           </div>
         </div>
 
@@ -104,6 +96,9 @@ export default function DashboardHome() {
                   </div>
                 </div>
               ))}
+              {activePackages.length === 0 && (
+                <p className="text-sm text-text-secondary text-center py-4">No active investment packages</p>
+              )}
             </div>
           </div>
         </div>
