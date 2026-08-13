@@ -19,6 +19,7 @@ marzRouter.post('/collect-money', async (req, res) => {
     const payload = {
       amount: ugxAmount,
       currency: 'UGX',
+      country: 'UG',
       phone_number: phone,
       provider,
       reference: reference || `PRIME-${Date.now()}`,
@@ -60,6 +61,7 @@ marzRouter.post('/disburse', async (req, res) => {
     const payload = {
       amount: ugxAmount,
       currency: 'UGX',
+      country: 'UG',
       phone_number: phone,
       provider,
       reference: reference || `PRIME-WD-${Date.now()}`,
@@ -67,7 +69,7 @@ marzRouter.post('/disburse', async (req, res) => {
       user_id,
     }
 
-    const response = await axios.post(`${marzConfig.baseUrl}/payout`, payload, {
+    const response = await axios.post(`${marzConfig.baseUrl}/send-money`, payload, {
       headers: getMarzAuthHeaders(),
     })
 

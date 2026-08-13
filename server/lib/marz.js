@@ -24,6 +24,7 @@ export async function initiateCollectMoney(payload) {
   const response = await axios.post(`${marzConfig.baseUrl}/collect-money`, {
     amount: ugxAmount,
     currency: 'UGX',
+    country: 'UG',
     phone_number: payload.phone,
     provider: payload.provider,
     reference: payload.reference || `PRIME-${Date.now()}`,
@@ -37,9 +38,10 @@ export async function initiateDisburse(payload) {
   const usdAmount = parseFloat(payload.amount)
   const ugxAmount = Math.round(usdAmount * 3700)
 
-  const response = await axios.post(`${marzConfig.baseUrl}/payout`, {
+  const response = await axios.post(`${marzConfig.baseUrl}/send-money`, {
     amount: ugxAmount,
     currency: 'UGX',
+    country: 'UG',
     phone_number: payload.phone,
     provider: payload.provider,
     reference: payload.reference || `PRIME-WD-${Date.now()}`,
