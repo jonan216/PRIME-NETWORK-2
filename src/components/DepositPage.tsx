@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ShieldCheck, Wallet, Building2, CreditCard, ArrowRight, Loader2, CheckCircle2, Clock, XCircle } from 'lucide-react'
+import { ShieldCheck, Wallet, Building2, CreditCard, ArrowRight, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { initiateDeposit, getTransactionStatus } from '../lib/marzApi'
 import { useAuth } from '../context/AuthContext'
 
@@ -42,31 +42,35 @@ export default function DepositPage() {
         user_id: user?.id ?? 'guest',
       })
 
-      if (result.data?.status === 'success' || result.data?.message?.includes('Sandbox Mode')) {
-        setStatus('completed')
+      // USSD prompt successfully pushed to user's phone.
+      // Transition UI to 'waiting' state so user sees the PIN prompt instruction on screen.
+      setStatus('waiting')
+
+      const txRef = result.reference || result.data?.reference
+      if (!txRef) {
+        console.warn('No reference returned for transaction status polling')
         return
       }
 
-      setStatus('waiting')
-
       const interval = setInterval(async () => {
         try {
-          const statusResult = await getTransactionStatus(result.reference)
-          const txStatus = statusResult.status || statusResult.data?.status
+          const statusResult = await getTransactionStatus(txRef)
+          const txStatus = String(statusResult.status || statusResult.data?.status || '').toLowerCase()
 
-          if (txStatus === 'credited' || txStatus === 'completed' || txStatus === 'success') {
+          if (['credited', 'completed', 'successful', 'paid', 'success'].includes(txStatus)) {
             setStatus('completed')
             clearInterval(interval)
-          } else if (txStatus === 'failed' || txStatus === 'rejected') {
+          } else if (['failed', 'rejected', 'cancelled', 'expired'].includes(txStatus)) {
             setStatus('failed')
             clearInterval(interval)
           }
         } catch {
-          // keep polling
+          // Keep polling while waiting for user to enter PIN
         }
       }, 3000)
 
-      setTimeout(() => clearInterval(interval), 60000)
+      // Keep polling up to 2 minutes for user PIN entry
+      setTimeout(() => clearInterval(interval), 120000)
     } catch (err: any) {
       setError(err.message || 'Failed to initiate deposit')
       setStatus('idle')
@@ -180,9 +184,17 @@ export default function DepositPage() {
                 </button>
 
                 {status === 'waiting' && (
-                  <div className="flex items-start gap-2 text-status-warning text-sm bg-status-warning/5 border border-status-warning/20 rounded-xl p-3">
-                    <Clock size={16} className="mt-0.5 flex-shrink-0" />
-                    <span>A payment prompt has been sent to your phone. Please enter your PIN to confirm.</span>
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400">
+                      <Loader2 size={22} className="animate-spin flex-shrink-0" />
+                      <div>
+                        <p className="font-semibold text-sm">USSD PIN Prompt Pushed to Phone</p>
+                        <p className="text-xs opacity-90">Target Number: <span className="font-mono font-bold">{phone}</span></p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-text-secondary leading-relaxed pl-8">
+                      Please check your mobile phone now and enter your <strong>Mobile Money PIN</strong> to authorize the transfer. The system is actively waiting for network confirmation.
+                    </p>
                   </div>
                 )}
               </form>
