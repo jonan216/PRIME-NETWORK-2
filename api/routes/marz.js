@@ -7,6 +7,13 @@ export const marzRouter = Router()
 
 const isValidUuid = (str) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
 
+const normalizeProvider = (p) => {
+  const s = String(p).toLowerCase()
+  if (s.includes('mtn')) return 'mtn_momo'
+  if (s.includes('airtel')) return 'airtel_money'
+  return p
+}
+
 // ---------------------------------------------------------------------------
 // POST /api/marz/collect-money  — Deposit (collect from user's MoMo/Airtel)
 // ---------------------------------------------------------------------------
@@ -26,7 +33,7 @@ marzRouter.post('/collect-money', async (req, res) => {
       currency: 'UGX',
       country: 'UG',
       phone_number: formatPhone(phone),   // E.164 e.g. +256781969741
-      provider,
+      provider: normalizeProvider(provider),
       reference: reference_,
       callback_url: marzConfig.callbackUrl,
       user_id,
@@ -72,7 +79,7 @@ marzRouter.post('/disburse', async (req, res) => {
       currency: 'UGX',
       country: 'UG',
       phone_number: formatPhone(phone),   // E.164 e.g. +256781969741
-      provider,
+      provider: normalizeProvider(provider),
       reference: reference_,
       callback_url: marzConfig.callbackUrl,
       user_id,
