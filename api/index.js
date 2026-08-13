@@ -6,19 +6,28 @@ const app = express()
 
 app.use(cors())
 
-// Capture rawBody BEFORE express.json() so the /webhook route can verify
-// HMAC-SHA256 signatures over the exact bytes Marz Innovations sent.
-app.use((req, _res, next) => {
-  let data = ''
-  req.on('data', chunk => { data += chunk })
-  req.on('end', () => {
-    req.rawBody = data
+// On Vercel serverless, capture rawBody using express.raw() BEFORE express.json().
+// This gives the webhook route the original bytes for HMAC-SHA256 verification.
+app.use((req, res, next) => {
+  express.raw({ type: '*/*', limit: '10mb' })(req, res, (err) => {
+    if (err) return next(err)
+    if (Buffer.isBuffer(req.body)) {
+      req.rawBody = req.body.toString('utf8')
+      // Re-parse as JSON for the rest of the routes
+      try {
+        req.body = JSON.parse(req.rawBody)
+      } catch {
+        req.body = {}
+      }
+    }
     next()
   })
 })
 
 app.use(express.json())
 
-app.use('/api', apiRouter)
+// Vercel strips the /api prefix before invoking this function,
+// so mount routes at / (not /api)
+app.use('/', apiRouter)
 
 export default app
