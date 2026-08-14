@@ -109,25 +109,33 @@ export default function WithdrawPage() {
               <>
                 <div className="mb-6">
                   <p className="text-sm text-text-secondary mb-1">Available Balance</p>
-                  <p className="text-4xl font-display font-semibold text-accent">UGX {(user?.balance ?? 0).toLocaleString('en-US')}</p>
+                  <p className="text-4xl font-display font-semibold text-accent">${(user?.balance ?? 0).toFixed(2)} USD</p>
+                  <p className="text-xs text-text-secondary mt-1">≈ UGX {((user?.balance ?? 0) * 3700).toLocaleString('en-US')}</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
                   <div>
-                    <label className="block text-sm font-medium text-text-primary mb-2">Amount</label>
+                    <label className="block text-sm font-medium text-text-primary mb-2">Amount (UGX)</label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary">UGX</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary font-medium">UGX</span>
                       <input
                         type="number"
                         value={amount}
                         onChange={e => setAmount(e.target.value)}
-                        placeholder="0"
+                        placeholder="18500"
                         required
-                      min={18500}
-                      className="w-full pl-14 pr-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
-                    />
-                  </div>
-                  <p className="text-xs text-text-secondary mt-1">Minimum withdrawal: UGX 18,500</p>
+                        min={18500}
+                        className="w-full pl-14 pr-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between mt-1 text-xs text-text-secondary">
+                      <span>Minimum withdrawal: <strong>UGX 18,500</strong> ($5.00 USD)</span>
+                      {amount && parseFloat(amount) > 0 && (
+                        <span className="text-accent font-semibold">
+                          ≈ ${(parseFloat(amount) / 3700).toFixed(2)} USD
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div>
