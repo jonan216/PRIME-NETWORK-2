@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Users, Copy, Check, TrendingUp } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 interface TeamMember {
   id: string
@@ -14,9 +15,16 @@ interface TeamMember {
 const teamMembers: TeamMember[] = []
 
 export default function TeamPage() {
+  const { user } = useAuth()
   const [copied, setCopied] = useState(false)
-  const referralCode = 'PRIME-2024-X7K9'
-  const referralLink = `https://prime-network.com/ref/${referralCode}`
+
+  // Generate dynamic referral code and domain link
+  const rawId = user?.id || 'MEMBER88'
+  const cleanId = rawId.replace(/[^a-zA-Z0-9]/g, '').slice(-6).toUpperCase()
+  const referralCode = `PRIME-${cleanId || 'PRO888'}`
+
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://prime-network-2.vercel.app'
+  const referralLink = `${baseUrl}/ref/${referralCode}`
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(referralLink)

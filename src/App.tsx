@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useParams, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ToastProvider } from './components/Toast'
 import ToastContainer from './components/ToastUI'
@@ -23,6 +23,11 @@ import NotificationsPage from './components/NotificationsPage'
 import SupportPage from './components/SupportPage'
 import KYCPage from './components/KYCPage'
 
+function ReferralRedirect() {
+  const { code } = useParams()
+  return <Navigate to={`/register?ref=${code}`} replace />
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -32,6 +37,8 @@ export default function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/ref/:code" element={<ReferralRedirect />} />
+            <Route path="/ref" element={<Navigate to="/register" replace />} />
 
             <Route path="/dashboard" element={
               <ProtectedRoute>
