@@ -120,7 +120,7 @@ export default function LandingPage() {
                       type="text"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      placeholder="John Doe"
+                      placeholder="Enter your full name"
                       className="w-full px-4 py-3 rounded-xl border border-cream-border bg-cream-card text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all"
                     />
                   </div>

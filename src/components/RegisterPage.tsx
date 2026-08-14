@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { User, Mail, Lock, Eye, EyeOff, CheckCircle2, Loader2, Users } from 'lucide-react'
+import { ChevronRight, Mail, Lock, Eye, EyeOff, Loader2, User, Users } from 'lucide-react'
 
 interface InputFieldProps {
   label: string
@@ -46,31 +46,35 @@ function InputField({ label, type, placeholder, icon, value, onChange, showToggl
 
 export default function RegisterPage() {
   const [searchParams] = useSearchParams()
-  const initialRef = searchParams.get('ref') || (typeof window !== 'undefined' ? sessionStorage.getItem('prime_ref_code') : '') || ''
+  const urlRef = searchParams.get('ref')
 
+  useEffect(() => {
+    if (urlRef) {
+      sessionStorage.setItem('prime_ref_code', urlRef)
+    }
+  }, [urlRef])
+
+  const initialRefCode = urlRef || (typeof window !== 'undefined' ? sessionStorage.getItem('prime_ref_code') : '') || ''
+
+  const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [referralCode, setReferralCode] = useState(initialRef)
+  const [referralCode, setReferralCode] = useState(initialRefCode)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [agreeTerms, setAgreeTerms] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const { register } = useAuth()
   const navigate = useNavigate()
 
-  const passwordStrength = password.length > 0
-    ? Math.min(100, password.length * 15 + (password.match(/[A-Z]/) ? 20 : 0) + (password.match(/[0-9]/) ? 20 : 0) + (password.match(/[^A-Za-z0-9]/) ? 20 : 0))
-    : 0
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
-    if (!agreeTerms) {
-      setError('You must agree to the Terms of Service and Privacy Policy')
+    if (!username || !fullName || !email || !password || !confirmPassword) {
+      setError('Please fill in all required fields')
       return
     }
 
@@ -100,13 +104,9 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-cream-primary flex items-center justify-center p-4 sm:p-6">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-accent/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-cream-soft rounded-full blur-3xl" />
-        <div className="absolute top-1/3 right-1/4 w-48 h-48 border border-cream-border/30 rounded-full" />
-        <div className="absolute bottom-1/3 left-1/3 w-32 h-32 border border-accent/15 rounded-full" />
-      </div>
+    <div className="min-h-screen bg-cream-primary flex items-center justify-center p-6 sm:p-12 relative overflow-hidden">
+      <div className="absolute top-20 left-20 w-72 h-72 bg-accent/5 rounded-full blur-3xl" />
+      <div className="absolute bottom-20 right-20 w-96 h-96 bg-cream-soft rounded-full blur-3xl" />
 
       <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-8">
@@ -124,9 +124,18 @@ export default function RegisterPage() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <InputField
+              label="Username"
+              type="text"
+              placeholder="Choose a username"
+              icon={<User size={18} />}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+
+            <InputField
               label="Full Name"
               type="text"
-              placeholder="John Doe"
+              placeholder="Enter your full name"
               icon={<User size={18} />}
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
@@ -141,27 +150,17 @@ export default function RegisterPage() {
               onChange={(e) => setEmail(e.target.value)}
             />
 
-            <div>
-              <InputField
-                label="Password"
-                type="password"
-                placeholder="Create a strong password"
-                icon={<Lock size={18} />}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                showToggle
-                showValue={showPassword}
-                onToggleShow={() => setShowPassword(!showPassword)}
-              />
-              {password.length > 0 && (
-                <div className="mt-2 h-1 bg-cream-soft rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-accent transition-all duration-300"
-                    style={{ width: `${passwordStrength}%` }}
-                  />
-                </div>
-              )}
-            </div>
+            <InputField
+              label="Password"
+              type="password"
+              placeholder="Create a strong password"
+              icon={<Lock size={18} />}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              showToggle
+              showValue={showPassword}
+              onToggleShow={() => setShowPassword(!showPassword)}
+            />
 
             <InputField
               label="Confirm Password"
@@ -175,29 +174,20 @@ export default function RegisterPage() {
               onToggleShow={() => setShowConfirmPassword(!showConfirmPassword)}
             />
 
-            <InputField
-              label="Referral Code (Optional)"
-              type="text"
-              placeholder="e.g. PRIME-A1B2C3"
-              icon={<Users size={18} />}
-              value={referralCode}
-              onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-            />
-
-            <div className="flex items-start gap-3">
-              <input
-                id="terms"
-                type="checkbox"
-                checked={agreeTerms}
-                onChange={(e) => setAgreeTerms(e.target.checked)}
-                className="mt-0.5 rounded border-cream-border text-accent focus:ring-accent"
-              />
-              <label htmlFor="terms" className="text-sm text-text-secondary cursor-pointer">
-                I agree to the{' '}
-                <NavLink to="/terms" className="text-accent hover:text-accent-hover font-medium">Terms of Service</NavLink>
-                {' '}and{' '}
-                <NavLink to="/privacy" className="text-accent hover:text-accent-hover font-medium">Privacy Policy</NavLink>
-              </label>
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-1.5">Referral Code (Optional)</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-text-secondary">
+                  <Users size={18} />
+                </div>
+                <input
+                  type="text"
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                  placeholder="e.g. PRIME-A1B2C3"
+                  className="w-full pl-10 px-4 py-3 rounded-xl border border-cream-border bg-cream-card text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all uppercase font-mono font-medium"
+                />
+              </div>
             </div>
 
             {error && (
@@ -208,7 +198,7 @@ export default function RegisterPage() {
 
             <button
               type="submit"
-              disabled={!agreeTerms || isSubmitting}
+              disabled={isSubmitting}
               className="w-full py-3.5 rounded-xl bg-accent hover:bg-accent-hover disabled:bg-accent/50 disabled:cursor-not-allowed text-white font-semibold transition-colors flex items-center justify-center gap-2"
             >
               {isSubmitting ? (
@@ -218,8 +208,8 @@ export default function RegisterPage() {
                 </>
               ) : (
                 <>
-                  <CheckCircle2 size={18} />
                   Create Account
+                  <ChevronRight size={18} />
                 </>
               )}
             </button>
