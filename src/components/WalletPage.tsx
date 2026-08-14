@@ -9,24 +9,7 @@ export default function WalletPage() {
       <div>
         <h1 className="font-display text-3xl font-bold text-text-primary">My Wallet</h1>
         <p className="text-text-secondary mt-1">Manage your funds and wallet settings</p>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
-          <p className="text-sm text-text-secondary mb-1">Main Balance</p>
-          <p className="text-3xl font-display font-bold text-accent">$4,380.00</p>
-        </div>
-        <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
-          <p className="text-sm text-text-secondary mb-1">Total Invested</p>
-          <p className="text-3xl font-display font-bold text-text-primary">$18,200.00</p>
-        </div>
-        <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
-          <p className="text-sm text-text-secondary mb-1">Total Earnings</p>
-          <p className="text-3xl font-display font-bold text-status-success">$3,850.00</p>
-        </div>
-      </div>
-
-      <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
         <div className="flex items-center gap-2 mb-6">
           <button
             onClick={() => setActiveTab('overview')}

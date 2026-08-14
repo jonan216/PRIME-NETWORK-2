@@ -621,13 +621,39 @@ export default function AdminDashboard() {
                   <input
                     type="number"
                     defaultValue="10"
-                    className="w-full px-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/20"
                   />
                 </div>
                 <button className="px-6 py-3 bg-accent hover:bg-accent-hover text-white rounded-xl font-medium transition-colors">
                   Save Settings
                 </button>
               </div>
+            </div>
+
+            <div className="bg-status-error/10 rounded-cream-lg border border-status-error/20 p-6">
+              <h2 className="text-lg font-semibold text-status-error mb-2 flex items-center gap-2">
+                <Trash2 size={20} />
+                Purge Test Data & Reset Platform
+              </h2>
+              <p className="text-sm text-text-secondary mb-4">
+                This will delete all test user accounts, mock transactions, and test investment data. Only your Administrator account (<code className="font-mono text-accent">primeadministratorwealth@gmail.com</code>) will be preserved.
+              </p>
+              <button
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to delete all test users and test data? This cannot be undone.')) {
+                    setUsers(initialUsers)
+                    setTransactions([])
+                    setProfits([])
+                    localStorage.removeItem('prime_transactions')
+                    localStorage.removeItem('prime_investments')
+                    localStorage.removeItem('prime_user_balance')
+                    alert('System successfully reset! All test data removed. System is ready for live users.')
+                  }
+                }}
+                className="px-6 py-3 bg-status-error hover:bg-red-700 text-white rounded-xl font-medium transition-colors flex items-center gap-2"
+              >
+                <Trash2 size={18} />
+                Purge All Test Data & Reset System
+              </button>
             </div>
           </div>
         )}
