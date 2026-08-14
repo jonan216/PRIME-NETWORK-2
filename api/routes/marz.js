@@ -34,6 +34,7 @@ marzRouter.post('/collect-money', async (req, res) => {
     const payload = {
       amount: ugxAmount,
       currency: 'UGX',
+      country: 'UG',
       phone_number: formattedPhone,   // E.164 e.g. +256781969741
       provider: normalizeProvider(provider),
       reference: reference_,
