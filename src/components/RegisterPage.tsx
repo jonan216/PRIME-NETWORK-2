@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { User, Mail, Lock, Eye, EyeOff, CheckCircle2, Loader2 } from 'lucide-react'
+import { User, Mail, Lock, Eye, EyeOff, CheckCircle2, Loader2, Users } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 
 interface InputFieldProps {
   label: string
@@ -45,10 +46,12 @@ function InputField({ label, type, placeholder, icon, value, onChange, showToggl
 }
 
 export default function RegisterPage() {
+  const [searchParams] = useSearchParams()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [referralCode, setReferralCode] = useState(searchParams.get('ref') || '')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [agreeTerms, setAgreeTerms] = useState(false)
@@ -169,6 +172,15 @@ export default function RegisterPage() {
               showToggle
               showValue={showConfirmPassword}
               onToggleShow={() => setShowConfirmPassword(!showConfirmPassword)}
+            />
+
+            <InputField
+              label="Referral Code (Optional)"
+              type="text"
+              placeholder="e.g. PRIME-A1B2C3"
+              icon={<Users size={18} />}
+              value={referralCode}
+              onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
             />
 
             <div className="flex items-start gap-3">
