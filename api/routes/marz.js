@@ -28,11 +28,13 @@ marzRouter.post('/collect-money', async (req, res) => {
     const ugxAmount = Math.round(parseFloat(amount))
     const reference_ = isValidUuid(reference) ? reference : crypto.randomUUID()
 
+    const formattedPhone = formatPhone(phone)
+    console.log('[MARZ] collect-money request -> phone:', formattedPhone, '| provider:', normalizeProvider(provider), '| amount:', ugxAmount)
+
     const payload = {
       amount: ugxAmount,
       currency: 'UGX',
-      country: 'UG',
-      phone_number: formatPhone(phone),   // E.164 e.g. +256781969741
+      phone_number: formattedPhone,   // E.164 e.g. +256781969741
       provider: normalizeProvider(provider),
       reference: reference_,
       callback_url: marzConfig.callbackUrl,

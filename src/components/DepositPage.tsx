@@ -33,10 +33,23 @@ export default function DepositPage() {
 
     try {
       const ugxValue = parseFloat(amount)
+
+      // Auto-format phone to E.164 (+256XXXXXXXXX) before sending
+      let formattedPhone = phone.replace(/\D/g, '')
+      if (formattedPhone.startsWith('0') && formattedPhone.length === 10) {
+        formattedPhone = '+256' + formattedPhone.slice(1)
+      } else if (formattedPhone.startsWith('256') && formattedPhone.length === 12) {
+        formattedPhone = '+' + formattedPhone
+      } else if (formattedPhone.length === 9) {
+        formattedPhone = '+256' + formattedPhone
+      } else if (!formattedPhone.startsWith('+')) {
+        formattedPhone = '+256' + formattedPhone
+      }
+
       const result = await initiateDeposit({
         amount: ugxValue,
         currency: 'UGX',
-        phone,
+        phone: formattedPhone,
         provider,
         reference: `DEP-${Date.now()}`,
         user_id: user?.id ?? 'guest',
@@ -78,7 +91,12 @@ export default function DepositPage() {
       // Keep polling up to 2 minutes for user PIN entry
       setTimeout(() => clearInterval(interval), 120000)
     } catch (err: any) {
-      setError(err.message || 'Failed to initiate deposit')
+      // Provide friendly errors for common Marz Innovations failure reasons
+      let errorMsg = err.message || 'Failed to initiate deposit'
+      if (errorMsg.toLowerCase().includes('no collection services') || errorMsg.toLowerCase().includes('available for country')) {
+        errorMsg = 'Mobile money collection is not yet active on this account. Please contact support or try again later.'
+      }
+      setError(errorMsg)
       setStatus('idle')
     }
   }
@@ -145,14 +163,22 @@ export default function DepositPage() {
                     {provider === 'mtn_momo' || provider === 'airtel_money' ? 'Phone Number' : 'Details'}
                   </label>
                   {provider === 'mtn_momo' || provider === 'airtel_money' ? (
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={e => setPhone(e.target.value)}
-                      placeholder="e.g. 0781969741"
-                      required
-                      className="w-full px-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
-                    />
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary font-mono text-sm">+256</span>
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={e => {
+                          // Strip any non-digit characters (user can type local 9-10 digit number)
+                          const raw = e.target.value.replace(/\D/g, '')
+                          setPhone(raw)
+                        }}
+                        placeholder="781969741"
+                        required
+                        maxLength={10}
+                        className="w-full pl-16 pr-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent/20 font-mono"
+                      />
+                    </div>
                   ) : (
                     <textarea
                       value={note}
