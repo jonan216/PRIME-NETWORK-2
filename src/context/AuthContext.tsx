@@ -26,52 +26,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
   const [isLoading, setIsLoading] = useState(false)
 
-const ADMIN_EMAIL = 'primeadministratorwealth@gmail.com'
-const ADMIN_PASSWORD = 'Wealth@2026!'
-const ADMIN_USER: User = {
-  id: 'admin-1',
-  email: ADMIN_EMAIL,
-  name: 'PRIME NETWORK ADMINISTRATOR',
-  role: 'admin',
-  kycVerified: true,
-}
+  const ADMIN_EMAIL = 'primeadministratorwealth@gmail.com'
+  const ADMIN_PASSWORD = 'Wealth@2026!'
+  const ADMIN_USER: User = {
+    id: 'admin-1',
+    email: ADMIN_EMAIL,
+    name: 'PRIME NETWORK ADMINISTRATOR',
+    role: 'admin',
+    kycVerified: true,
+  }
 
-const login = async (email: string, password: string) => {
-  setIsLoading(true)
-  await new Promise(r => setTimeout(r, 800))
+  const login = async (email: string, password: string) => {
+    setIsLoading(true)
+    await new Promise(r => setTimeout(r, 800))
 
-  if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-    setUser(ADMIN_USER)
-    localStorage.setItem('prime_user', JSON.stringify(ADMIN_USER))
+    const cleanEmail = email.trim().toLowerCase()
+    const cleanPassword = password.trim()
+
+    if (cleanEmail === ADMIN_EMAIL.toLowerCase() && cleanPassword === ADMIN_PASSWORD) {
+      setUser(ADMIN_USER)
+      localStorage.setItem('prime_user', JSON.stringify(ADMIN_USER))
+      setIsLoading(false)
+      return true
+    }
+
+    const mockUser: User = {
+      id: Date.now().toString(),
+      email: cleanEmail,
+      name: email.split('@')[0],
+      role: 'user',
+      kycVerified: true,
+    }
+    setUser(mockUser)
+    localStorage.setItem('prime_user', JSON.stringify(mockUser))
     setIsLoading(false)
     return true
   }
 
-  const mockUser: User = {
-    id: '1',
-    email,
-    name: email.split('@')[0],
-    role: 'user',
-    kycVerified: true,
-  }
-  setUser(mockUser)
-  localStorage.setItem('prime_user', JSON.stringify(mockUser))
-  setIsLoading(false)
-  return true
-}
-
   const register = async (email: string, _password: string, name: string) => {
     setIsLoading(true)
     await new Promise(r => setTimeout(r, 800))
-    const mockUser: User = {
+    const cleanEmail = email.trim().toLowerCase()
+    const isAdmin = cleanEmail === ADMIN_EMAIL.toLowerCase()
+    const newUser: User = isAdmin ? ADMIN_USER : {
       id: Date.now().toString(),
-      email,
+      email: cleanEmail,
       name,
       role: 'user',
       kycVerified: false,
     }
-    setUser(mockUser)
-    localStorage.setItem('prime_user', JSON.stringify(mockUser))
+    setUser(newUser)
+    localStorage.setItem('prime_user', JSON.stringify(newUser))
     setIsLoading(false)
     return true
   }

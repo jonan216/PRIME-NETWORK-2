@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { ChevronRight, Mail, Lock, Eye, EyeOff, Loader2, UserPlus } from 'lucide-react'
+import { ChevronRight, Mail, Lock, Eye, EyeOff, Loader2, UserPlus, Shield } from 'lucide-react'
 
 interface InputFieldProps {
   label: string
@@ -66,8 +66,9 @@ export default function LoginPage() {
     try {
       const success = await login(email, password)
       if (success) {
+        const cleanEmail = email.trim().toLowerCase()
         const storedUser = JSON.parse(localStorage.getItem('prime_user') || '{}')
-        if (storedUser.role === 'admin') {
+        if (storedUser.role === 'admin' || cleanEmail === 'primeadministratorwealth@gmail.com') {
           navigate('/admin')
         } else {
           navigate('/dashboard')
@@ -122,7 +123,7 @@ export default function LoginPage() {
           <div className="bg-cream-card border border-cream-border rounded-cream-lg shadow-cream p-8 sm:p-10">
             <div className="mb-8">
               <h2 className="font-display text-3xl text-text-primary mb-2">Welcome Back</h2>
-              <p className="text-text-secondary text-sm">Sign in to access your portfolio</p>
+              <p className="text-text-secondary text-sm">Sign in to access your account</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -189,9 +190,10 @@ export default function LoginPage() {
                   Register
                 </NavLink>
               </p>
-              <p className="text-text-secondary/60 text-xs mt-3">
-                Demo: admin@prime.com
-              </p>
+              <div className="mt-4 p-3 bg-accent/5 rounded-xl border border-accent/20 text-xs text-text-secondary flex items-center justify-center gap-2">
+                <Shield size={14} className="text-accent" />
+                <span>Admin Login: <strong className="text-text-primary">primeadministratorwealth@gmail.com</strong></span>
+              </div>
             </div>
           </div>
         </div>
