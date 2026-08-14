@@ -46,7 +46,7 @@ export default function DepositPage() {
       // Transition UI to 'waiting' state so user sees the PIN prompt instruction on screen.
       setStatus('waiting')
 
-      const txRef = result.reference || result.data?.reference
+      const txRef = result.reference || result.data?.reference || result.data?.data?.transaction?.reference || result.transaction?.reference
       if (!txRef) {
         console.warn('No reference returned for transaction status polling')
         return
@@ -55,9 +55,15 @@ export default function DepositPage() {
       const interval = setInterval(async () => {
         try {
           const statusResult = await getTransactionStatus(txRef)
-          const txStatus = String(statusResult.status || statusResult.data?.status || '').toLowerCase()
+          const txStatus = String(
+            statusResult.status ||
+            statusResult.data?.status ||
+            statusResult.data?.transaction?.status ||
+            statusResult.transaction?.status ||
+            ''
+          ).toLowerCase()
 
-          if (['credited', 'completed', 'successful', 'paid', 'success'].includes(txStatus)) {
+          if (['credited', 'completed', 'successful', 'paid', 'success', 'sandbox'].includes(txStatus)) {
             setStatus('completed')
             clearInterval(interval)
           } else if (['failed', 'rejected', 'cancelled', 'expired'].includes(txStatus)) {
@@ -112,11 +118,11 @@ export default function DepositPage() {
                       onChange={e => setAmount(e.target.value)}
                       placeholder="0"
                       required
-                      min={18500}
+                      min={1000}
                       className="w-full pl-14 pr-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
                     />
                   </div>
-                  <p className="text-xs text-text-secondary mt-1">Minimum deposit: UGX 18,500</p>
+                  <p className="text-xs text-text-secondary mt-1">Minimum deposit: UGX 1,000</p>
                 </div>
 
                 <div>

@@ -43,10 +43,17 @@ marzRouter.post('/collect-money', async (req, res) => {
       headers: getMarzAuthHeaders(),
     })
 
+    const isSandbox = Boolean(response.data?.data?.sandbox_mode || response.data?.sandbox_mode)
+
     return res.status(200).json({
       status: 'initiated',
+      message: isSandbox 
+        ? 'Sandbox collection simulated. Switch Marz Innovations dashboard to Live Mode to send physical USSD prompts.'
+        : 'USSD PIN confirmation prompt sent to user phone',
       data: response.data,
       reference: reference_,
+      is_sandbox: isSandbox,
+      transaction: response.data?.data?.transaction || null,
       ugxAmount,
     })
   } catch (error) {
