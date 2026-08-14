@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { ChevronRight, Mail, Lock, Eye, EyeOff, Loader2, UserPlus, Shield } from 'lucide-react'
+import { ChevronRight, User, Lock, Eye, EyeOff, Loader2, UserPlus, Shield } from 'lucide-react'
 
 interface InputFieldProps {
   label: string
@@ -45,7 +45,7 @@ function InputField({ label, type, placeholder, icon, value, onChange, showToggl
 }
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -57,24 +57,24 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
 
-    if (!email || !password) {
-      setError('Please enter both email and password')
+    if (!identifier || !password) {
+      setError('Please enter both email/username and password')
       return
     }
 
     setIsSubmitting(true)
     try {
-      const success = await login(email, password)
+      const success = await login(identifier, password)
       if (success) {
-        const cleanEmail = email.trim().toLowerCase()
+        const cleanId = identifier.trim().toLowerCase()
         const storedUser = JSON.parse(localStorage.getItem('prime_user') || '{}')
-        if (storedUser.role === 'admin' || cleanEmail === 'primeadministratorwealth@gmail.com') {
+        if (storedUser.role === 'admin' || cleanId === 'primeadministratorwealth@gmail.com' || cleanId === 'admin') {
           navigate('/admin')
         } else {
           navigate('/dashboard')
         }
       } else {
-        setError('Invalid email or password')
+        setError('Invalid username/email or password')
       }
     } catch (err: any) {
       setError(err.message || 'Login failed. Please try again.')
@@ -123,17 +123,17 @@ export default function LoginPage() {
           <div className="bg-cream-card border border-cream-border rounded-cream-lg shadow-cream p-8 sm:p-10">
             <div className="mb-8">
               <h2 className="font-display text-3xl text-text-primary mb-2">Welcome Back</h2>
-              <p className="text-text-secondary text-sm">Sign in to access your account</p>
+              <p className="text-text-secondary text-sm">Sign in with your Email or Username</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <InputField
-                label="Email Address"
-                type="email"
-                placeholder="you@example.com"
-                icon={<Mail size={18} />}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                label="Email or Username"
+                type="text"
+                placeholder="Enter your email or username"
+                icon={<User size={18} />}
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
               />
 
               <InputField

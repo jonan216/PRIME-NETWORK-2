@@ -11,7 +11,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null
-  login: (email: string, password: string) => Promise<boolean>
+  login: (identifier: string, password: string) => Promise<boolean>
   register: (email: string, password: string, name: string) => Promise<boolean>
   logout: () => void
   isLoading: boolean
@@ -36,14 +36,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     kycVerified: true,
   }
 
-  const login = async (email: string, password: string) => {
+  const login = async (identifier: string, password: string) => {
     setIsLoading(true)
     await new Promise(r => setTimeout(r, 800))
 
-    const cleanEmail = email.trim().toLowerCase()
+    const cleanId = identifier.trim().toLowerCase()
     const cleanPassword = password.trim()
 
-    if (cleanEmail === ADMIN_EMAIL.toLowerCase() && cleanPassword === ADMIN_PASSWORD) {
+    if ((cleanId === ADMIN_EMAIL.toLowerCase() || cleanId === 'admin') && cleanPassword === ADMIN_PASSWORD) {
       setUser(ADMIN_USER)
       localStorage.setItem('prime_user', JSON.stringify(ADMIN_USER))
       setIsLoading(false)
@@ -52,8 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const mockUser: User = {
       id: Date.now().toString(),
-      email: cleanEmail,
-      name: email.split('@')[0],
+      email: cleanId.includes('@') ? cleanId : `${cleanId}@user.com`,
+      name: cleanId.includes('@') ? cleanId.split('@')[0] : cleanId,
       role: 'user',
       kycVerified: true,
     }
