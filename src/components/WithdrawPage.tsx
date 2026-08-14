@@ -36,10 +36,22 @@ export default function WithdrawPage() {
     setStatus('pending')
 
     try {
+      // Auto-format phone to E.164 (+256XXXXXXXXX) before sending
+      let formattedPhone = phone.replace(/\D/g, '')
+      if (formattedPhone.startsWith('0') && formattedPhone.length === 10) {
+        formattedPhone = '+256' + formattedPhone.slice(1)
+      } else if (formattedPhone.startsWith('256') && formattedPhone.length === 12) {
+        formattedPhone = '+' + formattedPhone
+      } else if (formattedPhone.length === 9) {
+        formattedPhone = '+256' + formattedPhone
+      } else if (!formattedPhone.startsWith('+')) {
+        formattedPhone = '+256' + formattedPhone
+      }
+
       const result = await initiateWithdrawal({
         amount: parseFloat(amount),
         currency: 'UGX',
-        phone,
+        phone: formattedPhone,
         provider,
         reference: `WD-${Date.now()}`,
         user_id: user?.id ?? 'guest',
@@ -97,7 +109,7 @@ export default function WithdrawPage() {
               <>
                 <div className="mb-6">
                   <p className="text-sm text-text-secondary mb-1">Available Balance</p>
-                  <p className="text-4xl font-display font-semibold text-accent">$4,380.00</p>
+                  <p className="text-4xl font-display font-semibold text-accent">UGX {(user?.balance ?? 0).toLocaleString('en-US')}</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
@@ -146,14 +158,21 @@ export default function WithdrawPage() {
                         className="w-full px-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent/20 resize-none"
                       />
                     ) : (
-                      <input
-                        type="tel"
-                        value={phone}
-                        onChange={e => setPhone(e.target.value)}
-                        placeholder="e.g. 0781969741"
-                        required
-                        className="w-full px-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
-                      />
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary font-mono text-sm">+256</span>
+                        <input
+                          type="tel"
+                          value={phone}
+                          onChange={e => {
+                            const raw = e.target.value.replace(/\D/g, '')
+                            setPhone(raw)
+                          }}
+                          placeholder="781969741"
+                          required
+                          maxLength={10}
+                          className="w-full pl-16 pr-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent/20 font-mono"
+                        />
+                      </div>
                     )}
                   </div>
 

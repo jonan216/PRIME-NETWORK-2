@@ -6,6 +6,7 @@ interface User {
   name: string
   role: 'user' | 'admin'
   kycVerified: boolean
+  balance?: number
 }
 
 interface AuthContextType {
