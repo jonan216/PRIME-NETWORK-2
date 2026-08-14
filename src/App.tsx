@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, useParams, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import { AuthProvider } from './context/AuthContext'
 import { ToastProvider } from './components/Toast'
 import ToastContainer from './components/ToastUI'
@@ -25,7 +26,13 @@ import KYCPage from './components/KYCPage'
 
 function ReferralRedirect() {
   const { code } = useParams()
-  return <Navigate to={`/register?ref=${code}`} replace />
+  useEffect(() => {
+    if (code) {
+      sessionStorage.setItem('prime_ref_code', code)
+    }
+  }, [code])
+  
+  return <Navigate to={`/?ref=${code || ''}`} replace />
 }
 
 export default function App() {
@@ -38,7 +45,7 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/ref/:code" element={<ReferralRedirect />} />
-            <Route path="/ref" element={<Navigate to="/register" replace />} />
+            <Route path="/ref" element={<Navigate to="/" replace />} />
 
             <Route path="/dashboard" element={
               <ProtectedRoute>

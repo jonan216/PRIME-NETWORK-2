@@ -1,14 +1,26 @@
-import { useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { NavLink, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Shield, UserPlus, Eye, EyeOff } from 'lucide-react'
+import { Shield, UserPlus, Eye, EyeOff, Users } from 'lucide-react'
 
 export default function LandingPage() {
+  const [searchParams] = useSearchParams()
+  const urlRef = searchParams.get('ref')
+
+  useEffect(() => {
+    if (urlRef) {
+      sessionStorage.setItem('prime_ref_code', urlRef)
+    }
+  }, [urlRef])
+
+  const initialRefCode = urlRef || (typeof window !== 'undefined' ? sessionStorage.getItem('prime_ref_code') : '') || ''
+
   const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [referralCode, setReferralCode] = useState(initialRefCode)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState('')
@@ -161,6 +173,22 @@ export default function LandingPage() {
                       >
                         {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1.5">Referral Code (Optional)</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-text-secondary">
+                        <Users size={18} />
+                      </div>
+                      <input
+                        type="text"
+                        value={referralCode}
+                        onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                        placeholder="e.g. PRIME-A1B2C3"
+                        className="w-full pl-10 px-4 py-3 rounded-xl border border-cream-border bg-cream-card text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-all uppercase font-mono font-medium"
+                      />
                     </div>
                   </div>
 

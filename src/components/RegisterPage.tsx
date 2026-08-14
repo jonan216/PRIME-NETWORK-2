@@ -1,8 +1,7 @@
 import { useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { User, Mail, Lock, Eye, EyeOff, CheckCircle2, Loader2, Users } from 'lucide-react'
-import { useSearchParams } from 'react-router-dom'
 
 interface InputFieldProps {
   label: string
@@ -47,11 +46,13 @@ function InputField({ label, type, placeholder, icon, value, onChange, showToggl
 
 export default function RegisterPage() {
   const [searchParams] = useSearchParams()
+  const initialRef = searchParams.get('ref') || (typeof window !== 'undefined' ? sessionStorage.getItem('prime_ref_code') : '') || ''
+
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [referralCode, setReferralCode] = useState(searchParams.get('ref') || '')
+  const [referralCode, setReferralCode] = useState(initialRef)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [agreeTerms, setAgreeTerms] = useState(false)
