@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { ChevronRight, User, Lock, Eye, EyeOff, Loader2, UserPlus, Shield } from 'lucide-react'
+import { ChevronRight, User, Lock, Eye, EyeOff, Loader2, UserPlus } from 'lucide-react'
 
 interface InputFieldProps {
   label: string
@@ -190,10 +190,7 @@ export default function LoginPage() {
                   Register
                 </NavLink>
               </p>
-              <div className="mt-4 p-3 bg-accent/5 rounded-xl border border-accent/20 text-xs text-text-secondary flex items-center justify-center gap-2">
-                <Shield size={14} className="text-accent" />
-                <span>Admin Login: <strong className="text-text-primary">primeadministratorwealth@gmail.com</strong></span>
-              </div>
+
             </div>
           </div>
         </div>
