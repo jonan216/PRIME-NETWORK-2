@@ -86,9 +86,95 @@ export default function AdminDashboard() {
     setProfits(prev => prev.map(p => p.id === profitId ? { ...p, status: 'rejected' } : p))
   }
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
   return (
-    <div className="flex min-h-screen bg-cream-primary">
-      <aside className="fixed inset-y-0 left-0 z-40 w-[260px] bg-nav-dark flex flex-col">
+    <div className="min-h-screen bg-cream-primary flex flex-col md:flex-row">
+      {/* Mobile Header */}
+      <header className="md:hidden sticky top-0 z-40 bg-nav-dark px-4 py-3 flex items-center justify-between text-cream-primary shadow-md border-b border-white/10">
+        <div className="flex items-center gap-2">
+          <div className="h-7 w-7 rounded-lg bg-accent flex items-center justify-center">
+            <Shield className="h-4 w-4 text-white" />
+          </div>
+          <span className="font-display text-base font-semibold">ADMIN PANEL</span>
+        </div>
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="p-2 rounded-lg text-cream-primary/80 hover:text-white hover:bg-white/10 transition-colors"
+        >
+          {mobileMenuOpen ? <XCircle size={22} /> : <BarChart3 size={22} />}
+        </button>
+      </header>
+
+      {/* Mobile Drawer Menu */}
+      {mobileMenuOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex"
+          onClick={() => setMobileMenuOpen(false)}
+        >
+          <div
+            className="w-[280px] max-w-[80vw] bg-nav-dark h-full flex flex-col p-5 shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
+              <span className="font-display text-base font-semibold text-cream-primary">ADMIN MENU</span>
+              <button onClick={() => setMobileMenuOpen(false)} className="text-cream-primary/70 hover:text-white">
+                <XCircle size={20} />
+              </button>
+            </div>
+            <nav className="space-y-1">
+              <button
+                onClick={() => { setActiveTab('overview'); setMobileMenuOpen(false) }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
+                  activeTab === 'overview' ? 'bg-nav-active text-nav-active-text' : 'text-cream-primary/70 hover:bg-nav-hover'
+                }`}
+              >
+                <BarChart3 size={18} />
+                Overview
+              </button>
+              <button
+                onClick={() => { setActiveTab('users'); setMobileMenuOpen(false) }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
+                  activeTab === 'users' ? 'bg-nav-active text-nav-active-text' : 'text-cream-primary/70 hover:bg-nav-hover'
+                }`}
+              >
+                <Users size={18} />
+                Users
+              </button>
+              <button
+                onClick={() => { setActiveTab('transactions'); setMobileMenuOpen(false) }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
+                  activeTab === 'transactions' ? 'bg-nav-active text-nav-active-text' : 'text-cream-primary/70 hover:bg-nav-hover'
+                }`}
+              >
+                <ArrowLeftRight size={18} />
+                Transactions
+              </button>
+              <button
+                onClick={() => { setActiveTab('profits'); setMobileMenuOpen(false) }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
+                  activeTab === 'profits' ? 'bg-nav-active text-nav-active-text' : 'text-cream-primary/70 hover:bg-nav-hover'
+                }`}
+              >
+                <TrendingUp size={18} />
+                Profit Approval
+              </button>
+              <button
+                onClick={() => { setActiveTab('settings'); setMobileMenuOpen(false) }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
+                  activeTab === 'settings' ? 'bg-nav-active text-nav-active-text' : 'text-cream-primary/70 hover:bg-nav-hover'
+                }`}
+              >
+                <Settings size={18} />
+                Settings
+              </button>
+            </nav>
+          </div>
+        </div>
+      )}
+
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex fixed inset-y-0 left-0 z-40 w-[260px] bg-nav-dark flex-col">
         <div className="flex items-center gap-3 px-6 py-6">
           <div className="h-8 w-8 rounded-lg bg-accent flex items-center justify-center">
             <Shield className="h-5 w-5 text-white" />
@@ -153,7 +239,7 @@ export default function AdminDashboard() {
         </div>
       </aside>
 
-      <main className="flex-1 ml-[260px] p-8">
+      <main className="flex-1 md:ml-[260px] p-4 sm:p-6 md:p-8">
         <h1 className="font-display text-3xl font-semibold text-text-primary mb-8">Admin Dashboard</h1>
 
         {activeTab === 'overview' && (
