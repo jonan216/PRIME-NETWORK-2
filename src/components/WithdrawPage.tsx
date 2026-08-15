@@ -128,7 +128,7 @@ export default function WithdrawPage() {
                       />
                     </div>
                     <div className="flex items-center justify-between mt-1 text-xs text-text-secondary">
-                      <span>Minimum withdrawal: <strong>UGX 18,500</strong> ($5.00 USD)</span>
+                      <span>Minimum withdrawal: <strong>UGX 10,000</strong></span>
                       {amount && parseFloat(amount) > 0 && (
                         <span className="text-accent font-semibold">
                           ≈ ${(parseFloat(amount) / 3700).toFixed(2)} USD

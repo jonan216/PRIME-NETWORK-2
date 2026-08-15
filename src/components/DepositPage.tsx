@@ -130,18 +130,18 @@ export default function DepositPage() {
                   <label className="block text-sm font-medium text-text-primary mb-2">Amount (UGX)</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary font-medium">UGX</span>
-                    <input
-                      type="number"
-                      value={amount}
-                      onChange={e => setAmount(e.target.value)}
-                      placeholder="18500"
-                      required
-                      min={18500}
-                      className="w-full pl-14 pr-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
-                    />
+                      <input
+                        type="number"
+                        value={amount}
+                        onChange={e => setAmount(e.target.value)}
+                        placeholder="5000"
+                        required
+                        min={5000}
+                        className="w-full pl-14 pr-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
+                      />
                   </div>
                   <div className="flex items-center justify-between mt-1 text-xs text-text-secondary">
-                    <span>Minimum deposit: <strong>UGX 18,500</strong> ($5.00 USD)</span>
+                    <span>Minimum deposit: <strong>UGX 5,000</strong></span>
                     {amount && parseFloat(amount) > 0 && (
                       <span className="text-accent font-semibold">
                         ≈ ${(parseFloat(amount) / 3700).toFixed(2)} USD
