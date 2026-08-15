@@ -125,31 +125,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: false, error: 'Username already taken. Please choose another.' }
     }
 
-    const { data, error } = await supabase.auth.signUp({ email: cleanEmail, password })
+    const { error } = await supabase.auth.signUp({ 
+      email: cleanEmail, 
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          username: cleanUsername,
+          referred_by: referredBy || null
+        }
+      }
+    })
     if (error) {
       setIsLoading(false)
       return { success: false, error: mapSupabaseError(error) }
-    }
-
-    if (data.user) {
-      const role = cleanEmail === ADMIN_EMAIL ? 'admin' : 'user'
-
-      const { error: profileError } = await supabase.from('profiles').insert({
-        id: data.user.id,
-        email: cleanEmail,
-        full_name: fullName,
-        username: cleanUsername,
-        role,
-        referred_by: referredBy || null,
-        balance: 0,
-        kyc_verified: false,
-        status: 'active',
-      })
-
-      if (profileError) {
-        setIsLoading(false)
-        return { success: false, error: mapSupabaseError(profileError) }
-      }
     }
 
     setIsLoading(false)
