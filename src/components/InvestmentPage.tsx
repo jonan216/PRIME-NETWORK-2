@@ -1,5 +1,7 @@
-import { useState } from 'react'
-import { TrendingUp } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { TrendingUp, Loader2 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import { supabase, mapSupabaseError } from '../lib/supabaseClient'
 
 interface Plan {
   id: string
@@ -12,11 +14,11 @@ interface Plan {
 
 interface ActiveInvestment {
   id: string
-  planName: string
-  invested: number
-  currentValue: number
-  startDate: string
-  status: 'active' | 'pending'
+  plan_name: string
+  amount: number
+  daily_roi: number
+  created_at: string
+  status: string
 }
 
 const plans: Plan[] = [
@@ -24,52 +26,57 @@ const plans: Plan[] = [
     id: 'starter',
     name: 'Starter Plan',
     roi: 5,
-    minInvestment: 100,
-    maxInvestment: 1000,
-    description: 'Perfect for beginners looking to grow their wealth steadily.'
+    minInvestment: 5000,
+    maxInvestment: 100000,
+    description: 'Perfect for beginners. Minimum UGX 5,000 to get started.'
   },
   {
     id: 'growth',
     name: 'Growth Plan',
     roi: 8,
-    minInvestment: 1000,
-    maxInvestment: 10000,
-    description: 'Accelerated returns for serious investors.'
+    minInvestment: 101000,
+    maxInvestment: 1000000,
+    description: 'Accelerated daily returns for growing investors.'
   },
   {
     id: 'premium',
     name: 'Premium Plan',
     roi: 12,
-    minInvestment: 10000,
-    maxInvestment: 100000,
+    minInvestment: 1001000,
+    maxInvestment: 10000000,
     description: 'Maximum returns with exclusive priority support.'
   }
 ]
 
-const activeInvestments: ActiveInvestment[] = [
-  {
-    id: '1',
-    planName: 'Growth Plan',
-    invested: 2500,
-    currentValue: 2850,
-    startDate: '2026-07-15',
-    status: 'active'
-  },
-  {
-    id: '2',
-    planName: 'Starter Plan',
-    invested: 500,
-    currentValue: 562.5,
-    startDate: '2026-08-01',
-    status: 'active'
-  }
-]
-
 export default function InvestmentPage() {
+  const { profile } = useAuth()
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
+  const [activeInvestments, setActiveInvestments] = useState<ActiveInvestment[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const totalInvested = activeInvestments.reduce((sum, inv) => sum + inv.invested, 0)
-  const totalEarnings = activeInvestments.reduce((sum, inv) => sum + (inv.currentValue - inv.invested), 0)
+  useEffect(() => {
+    async function loadInvestments() {
+      if (!profile?.id) return
+      setLoading(true)
+
+      const { data, error } = await supabase
+        .from('investments')
+        .select('*')
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false })
+
+      if (!error && data) {
+        setActiveInvestments(data)
+      } else if (error) {
+        console.error('Error loading investments:', mapSupabaseError(error))
+      }
+      setLoading(false)
+    }
+
+    loadInvestments()
+  }, [profile?.id])
+
+  const totalInvested = activeInvestments.reduce((sum, inv) => sum + (inv.amount || 0), 0)
   const activePlansCount = activeInvestments.filter(inv => inv.status === 'active').length
 
   return (
@@ -79,7 +86,7 @@ export default function InvestmentPage() {
           Investment Plans
         </h1>
         <p className="text-text-secondary mb-10 max-w-2xl">
-          Choose the plan that fits your financial goals. All plans come with guaranteed monthly returns and full capital protection.
+          Choose the plan that fits your financial goals. All plans come with guaranteed daily returns.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
@@ -113,17 +120,17 @@ export default function InvestmentPage() {
                   </div>
                   <div>
                     <span className="text-2xl font-bold text-accent">{plan.roi}%</span>
-                    <span className="text-text-secondary text-sm ml-1">monthly return</span>
+                    <span className="text-text-secondary text-sm ml-1">daily return</span>
                   </div>
                 </div>
                 <div className="space-y-2 mb-6">
                   <div className="flex justify-between text-sm">
                     <span className="text-text-secondary">Min Investment</span>
-                    <span className="text-text-primary font-medium">${plan.minInvestment.toLocaleString()}</span>
+                    <span className="text-text-primary font-medium">UGX {plan.minInvestment.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-text-secondary">Max Investment</span>
-                    <span className="text-text-primary font-medium">${plan.maxInvestment.toLocaleString()}</span>
+                    <span className="text-text-primary font-medium">UGX {plan.maxInvestment.toLocaleString()}</span>
                   </div>
                 </div>
                 <button
@@ -143,62 +150,62 @@ export default function InvestmentPage() {
 
         <div className="mb-16">
           <h2 className="text-2xl font-display font-bold text-text-primary mb-6">
-            My Investments
+            My Active Investments
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {activeInvestments.map((investment) => {
-              const profit = investment.currentValue - investment.invested
-              const profitPercent = ((profit / investment.invested) * 100).toFixed(1)
-              return (
-                <div
-                  key={investment.id}
-                  className="bg-cream-card rounded-cream-lg border border-cream-border p-5 shadow-cream"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h3 className="font-semibold text-text-primary">{investment.planName}</h3>
-                      <p className="text-text-secondary text-sm">Started {investment.startDate}</p>
+          {loading ? (
+            <div className="flex justify-center py-10"><Loader2 className="animate-spin text-accent" size={28} /></div>
+          ) : activeInvestments.length === 0 ? (
+            <div className="bg-cream-card rounded-cream-lg border border-cream-border p-10 text-center">
+              <TrendingUp size={40} className="text-text-secondary/40 mx-auto mb-3" />
+              <p className="text-text-secondary text-sm font-medium">No active investments yet</p>
+              <p className="text-text-secondary/60 text-xs mt-1">Select a plan above and make a deposit to start earning daily returns.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {activeInvestments.map((investment) => {
+                return (
+                  <div
+                    key={investment.id}
+                    className="bg-cream-card rounded-cream-lg border border-cream-border p-5 shadow-cream"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h3 className="font-semibold text-text-primary">{investment.plan_name}</h3>
+                        <p className="text-text-secondary text-sm">Started {new Date(investment.created_at).toLocaleDateString()}</p>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-accent/10 text-accent capitalize">
+                        {investment.status}
+                      </span>
                     </div>
-                    <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-accent/10 text-accent capitalize">
-                      {investment.status}
-                    </span>
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <p className="text-text-secondary text-xs mb-1">Invested</p>
+                        <p className="text-text-primary font-semibold">UGX {investment.amount.toLocaleString()}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-text-secondary text-xs mb-1">Daily ROI</p>
+                        <p className="text-status-success font-semibold">+{investment.daily_roi}% / day</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-end">
-                    <div>
-                      <p className="text-text-secondary text-xs mb-1">Invested</p>
-                      <p className="text-text-primary font-semibold">${investment.invested.toLocaleString()}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-text-secondary text-xs mb-1">Current Value</p>
-                      <p className="text-accent font-semibold">${investment.currentValue.toLocaleString()}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-text-secondary text-xs mb-1">Profit</p>
-                      <p className="text-status-success font-semibold">+${profit.toLocaleString()} (+{profitPercent}%)</p>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         <div>
           <h2 className="text-2xl font-display font-bold text-text-primary mb-6">
             Overview
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-cream-card rounded-cream-lg border border-cream-border p-5 shadow-cream">
               <p className="text-text-secondary text-sm mb-1">Total Invested</p>
-              <p className="text-2xl font-bold text-text-primary">${totalInvested.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-text-primary">UGX {totalInvested.toLocaleString()}</p>
             </div>
             <div className="bg-cream-card rounded-cream-lg border border-cream-border p-5 shadow-cream">
               <p className="text-text-secondary text-sm mb-1">Active Plans</p>
               <p className="text-2xl font-bold text-text-primary">{activePlansCount}</p>
-            </div>
-            <div className="bg-cream-card rounded-cream-lg border border-cream-border p-5 shadow-cream">
-              <p className="text-text-secondary text-sm mb-1">Total Earnings</p>
-              <p className="text-2xl font-bold text-status-success">+${totalEarnings.toLocaleString()}</p>
             </div>
           </div>
         </div>

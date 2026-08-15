@@ -1,95 +1,161 @@
-import { useState } from 'react'
-import { Shield, Users, ArrowLeftRight, TrendingUp, CheckCircle2, XCircle, Search, Settings, BarChart3, Trash2 } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Shield, Users, ArrowLeftRight, TrendingUp, CheckCircle2, XCircle, Search, Settings, BarChart3, Trash2, RefreshCw, Loader2 } from 'lucide-react'
+import { supabase, mapSupabaseError } from '../lib/supabaseClient'
 
-interface User {
+interface Profile {
   id: string
-  name: string
+  full_name: string
+  username: string
   email: string
-  joined: string
-  status: 'active' | 'pending' | 'suspended'
-  invested: number
-  earnings: number
+  role: string
+  status: string
+  balance: number
+  kyc_verified: boolean
+  created_at: string
 }
 
 interface Transaction {
   id: string
-  user: string
-  type: 'deposit' | 'withdrawal' | 'investment' | 'earning'
+  user_id: string
+  type: string
   amount: number
-  status: 'pending' | 'approved' | 'rejected'
-  date: string
+  status: string
+  provider: string | null
+  reference: string | null
+  created_at: string
+  profiles?: { full_name: string; email: string }
 }
-
-interface ProfitApproval {
-  id: string
-  user: string
-  amount: number
-  date: string
-  status: 'pending' | 'approved' | 'rejected'
-}
-
-const initialUsers: User[] = [
-  {
-    id: 'admin-1',
-    name: 'PRIME NETWORK ADMINISTRATOR',
-    email: 'primeadministratorwealth@gmail.com',
-    joined: '2026-08-01',
-    status: 'active',
-    invested: 0,
-    earnings: 0,
-  },
-]
-
-const initialTransactions: Transaction[] = []
-const initialProfits: ProfitApproval[] = []
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview')
-  const [users, setUsers] = useState<User[]>(initialUsers)
-  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions)
-  const [profits, setProfits] = useState<ProfitApproval[]>(initialProfits)
+  const [users, setUsers] = useState<Profile[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [txLoading, setTxLoading] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  const totalInvested = users.reduce((sum, u) => sum + u.invested, 0)
-  const totalEarnings = users.reduce((sum, u) => sum + u.earnings, 0)
-  const pendingTransactions = transactions.filter(t => t.status === 'pending').length
-  const pendingProfits = profits.filter(p => p.status === 'pending').length
-  const totalUsers = users.length
-  const activeUsers = users.filter(u => u.status === 'active').length
+  // ─── Data loaders ─────────────────────────────────────────────
+  const loadUsers = useCallback(async () => {
+    setUsersLoading(true)
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (error) {
+      console.error('Error loading users:', mapSupabaseError(error))
+    } else if (data) {
+      setUsers(data as Profile[])
+    }
+    setUsersLoading(false)
+  }, [])
 
-  const filteredUsers = users.filter(u =>
-    u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.email.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const loadTransactions = useCallback(async () => {
+    setTxLoading(true)
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*, profiles(full_name, email)')
+      .order('created_at', { ascending: false })
+    if (error) {
+      console.error('Error loading transactions:', mapSupabaseError(error))
+    } else if (data) {
+      setTransactions(data as Transaction[])
+    }
+    setTxLoading(false)
+  }, [])
 
-  const updateUserStatus = (userId: string, status: User['status']) => {
+  // Load on mount and on tab change
+  useEffect(() => { loadUsers() }, [loadUsers])
+  useEffect(() => {
+    if (activeTab === 'transactions' || activeTab === 'profits') loadTransactions()
+  }, [activeTab, loadTransactions])
+
+  // ─── Actions ──────────────────────────────────────────────────
+  const updateUserStatus = async (userId: string, status: string) => {
+    const { error } = await supabase.from('profiles').update({ status }).eq('id', userId)
+    if (error) {
+      console.error('Error updating user status:', mapSupabaseError(error))
+      return
+    }
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, status } : u))
   }
 
-  const deleteUser = (userId: string) => {
+  const deleteUser = async (userId: string) => {
+    const { error } = await supabase.from('profiles').delete().eq('id', userId)
+    if (error) {
+      console.error('Error deleting user:', mapSupabaseError(error))
+      return
+    }
     setUsers(prev => prev.filter(u => u.id !== userId))
   }
 
-  const approveTransaction = (txId: string) => {
+  const approveTransaction = async (txId: string) => {
+    const { error } = await supabase.from('transactions').update({ status: 'approved' }).eq('id', txId)
+    if (error) {
+      console.error('Error approving transaction:', mapSupabaseError(error))
+      return
+    }
     setTransactions(prev => prev.map(t => t.id === txId ? { ...t, status: 'approved' } : t))
   }
 
-  const rejectTransaction = (txId: string) => {
+  const rejectTransaction = async (txId: string) => {
+    const { error } = await supabase.from('transactions').update({ status: 'rejected' }).eq('id', txId)
+    if (error) {
+      console.error('Error rejecting transaction:', mapSupabaseError(error))
+      return
+    }
     setTransactions(prev => prev.map(t => t.id === txId ? { ...t, status: 'rejected' } : t))
   }
 
-  const approveProfit = (profitId: string) => {
-    setProfits(prev => prev.map(p => p.id === profitId ? { ...p, status: 'approved' } : p))
-  }
+  // ─── Derived stats ────────────────────────────────────────────
+  const nonAdminUsers = users.filter(u => u.role !== 'admin')
+  const activeUsers = nonAdminUsers.filter(u => u.status === 'active').length
+  const pendingTx = transactions.filter(t => t.status === 'pending').length
+  const totalBalance = nonAdminUsers.reduce((s, u) => s + (u.balance || 0), 0)
 
-  const rejectProfit = (profitId: string) => {
-    setProfits(prev => prev.map(p => p.id === profitId ? { ...p, status: 'rejected' } : p))
-  }
+  const filteredUsers = users.filter(u =>
+    (u.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (u.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const pendingTransactions = transactions.filter(t => t.status === 'pending')
+
+  // ─── Shared status badge ──────────────────────────────────────
+  const StatusBadge = ({ status }: { status: string }) => (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+      status === 'active' || status === 'approved' ? 'bg-status-success/10 text-status-success' :
+      status === 'pending' ? 'bg-status-warning/10 text-status-warning' :
+      'bg-status-error/10 text-status-error'
+    }`}>
+      {status}
+    </span>
+  )
+
+  // ─── Sidebar nav items ────────────────────────────────────────
+  const navItems = [
+    { id: 'overview', label: 'Overview', Icon: BarChart3 },
+    { id: 'users', label: 'Users', Icon: Users },
+    { id: 'transactions', label: 'Transactions', Icon: ArrowLeftRight },
+    { id: 'profits', label: 'Profit Approval', Icon: TrendingUp },
+    { id: 'settings', label: 'Settings', Icon: Settings },
+  ]
+
+  const NavButton = ({ id, label, Icon }: { id: string; label: string; Icon: React.ElementType }) => (
+    <button
+      onClick={() => { setActiveTab(id); setMobileMenuOpen(false) }}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
+        activeTab === id ? 'bg-nav-active text-nav-active-text' : 'text-cream-primary/70 hover:bg-nav-hover'
+      }`}
+    >
+      <Icon size={18} />
+      {label}
+    </button>
+  )
 
   return (
     <div className="min-h-screen bg-cream-primary flex flex-col md:flex-row">
+
       {/* Mobile Header */}
       <header className="md:hidden sticky top-0 z-40 bg-nav-dark px-4 py-3 flex items-center justify-between text-cream-primary shadow-md border-b border-white/10">
         <div className="flex items-center gap-2">
@@ -106,7 +172,7 @@ export default function AdminDashboard() {
         </button>
       </header>
 
-      {/* Mobile Drawer Menu */}
+      {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div
           className="md:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex"
@@ -123,51 +189,7 @@ export default function AdminDashboard() {
               </button>
             </div>
             <nav className="space-y-1">
-              <button
-                onClick={() => { setActiveTab('overview'); setMobileMenuOpen(false) }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
-                  activeTab === 'overview' ? 'bg-nav-active text-nav-active-text' : 'text-cream-primary/70 hover:bg-nav-hover'
-                }`}
-              >
-                <BarChart3 size={18} />
-                Overview
-              </button>
-              <button
-                onClick={() => { setActiveTab('users'); setMobileMenuOpen(false) }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
-                  activeTab === 'users' ? 'bg-nav-active text-nav-active-text' : 'text-cream-primary/70 hover:bg-nav-hover'
-                }`}
-              >
-                <Users size={18} />
-                Users
-              </button>
-              <button
-                onClick={() => { setActiveTab('transactions'); setMobileMenuOpen(false) }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
-                  activeTab === 'transactions' ? 'bg-nav-active text-nav-active-text' : 'text-cream-primary/70 hover:bg-nav-hover'
-                }`}
-              >
-                <ArrowLeftRight size={18} />
-                Transactions
-              </button>
-              <button
-                onClick={() => { setActiveTab('profits'); setMobileMenuOpen(false) }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
-                  activeTab === 'profits' ? 'bg-nav-active text-nav-active-text' : 'text-cream-primary/70 hover:bg-nav-hover'
-                }`}
-              >
-                <TrendingUp size={18} />
-                Profit Approval
-              </button>
-              <button
-                onClick={() => { setActiveTab('settings'); setMobileMenuOpen(false) }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
-                  activeTab === 'settings' ? 'bg-nav-active text-nav-active-text' : 'text-cream-primary/70 hover:bg-nav-hover'
-                }`}
-              >
-                <Settings size={18} />
-                Settings
-              </button>
+              {navItems.map(n => <NavButton key={n.id} {...n} />)}
             </nav>
           </div>
         </div>
@@ -181,151 +203,105 @@ export default function AdminDashboard() {
           </div>
           <span className="font-display text-lg font-semibold text-cream-primary">PRIME NETWORK</span>
         </div>
-
         <div className="px-4 pb-2">
           <p className="text-xs text-cream-primary/50 uppercase tracking-wider">Administrator</p>
         </div>
-
         <nav className="flex-1 px-4 space-y-1">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
-              activeTab === 'overview' ? 'bg-nav-active text-nav-active-text' : 'text-cream-primary/70 hover:bg-nav-hover'
-            }`}
-          >
-            <BarChart3 size={18} />
-            Overview
-          </button>
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
-              activeTab === 'users' ? 'bg-nav-active text-nav-active-text' : 'text-cream-primary/70 hover:bg-nav-hover'
-            }`}
-          >
-            <Users size={18} />
-            Users
-          </button>
-          <button
-            onClick={() => setActiveTab('transactions')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
-              activeTab === 'transactions' ? 'bg-nav-active text-nav-active-text' : 'text-cream-primary/70 hover:bg-nav-hover'
-            }`}
-          >
-            <ArrowLeftRight size={18} />
-            Transactions
-          </button>
-          <button
-            onClick={() => setActiveTab('profits')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
-              activeTab === 'profits' ? 'bg-nav-active text-nav-active-text' : 'text-cream-primary/70 hover:bg-nav-hover'
-            }`}
-          >
-            <TrendingUp size={18} />
-            Profit Approval
-          </button>
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
-              activeTab === 'settings' ? 'bg-nav-active text-nav-active-text' : 'text-cream-primary/70 hover:bg-nav-hover'
-            }`}
-          >
-            <Settings size={18} />
-            Settings
-          </button>
+          {navItems.map(n => <NavButton key={n.id} {...n} />)}
         </nav>
-
         <div className="p-4 border-t border-white/10">
-          <p className="text-xs text-cream-primary/50 text-center">Admin Panel</p>
+          <p className="text-xs text-cream-primary/50 text-center">Admin Panel · Supabase Live</p>
         </div>
       </aside>
 
       <main className="flex-1 md:ml-[260px] p-4 sm:p-6 md:p-8">
         <h1 className="font-display text-3xl font-semibold text-text-primary mb-8">Admin Dashboard</h1>
 
+        {/* ── OVERVIEW ── */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
                 <p className="text-sm text-text-secondary mb-1">Total Users</p>
-                <p className="text-3xl font-display font-semibold text-text-primary">{totalUsers}</p>
+                <p className="text-3xl font-display font-semibold text-text-primary">{nonAdminUsers.length}</p>
                 <p className="text-xs text-text-secondary mt-1">{activeUsers} active</p>
               </div>
               <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
-                <p className="text-sm text-text-secondary mb-1">Total Invested</p>
-                <p className="text-3xl font-display font-semibold text-accent">${totalInvested.toLocaleString()}</p>
+                <p className="text-sm text-text-secondary mb-1">Combined Balance</p>
+                <p className="text-3xl font-display font-semibold text-accent">
+                  UGX {totalBalance.toLocaleString()}
+                </p>
               </div>
               <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
-                <p className="text-sm text-text-secondary mb-1">Total Earnings Paid</p>
-                <p className="text-3xl font-display font-semibold text-status-success">${totalEarnings.toLocaleString()}</p>
+                <p className="text-sm text-text-secondary mb-1">Total Transactions</p>
+                <p className="text-3xl font-display font-semibold text-text-primary">{transactions.length}</p>
               </div>
               <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
                 <p className="text-sm text-text-secondary mb-1">Pending Actions</p>
-                <p className="text-3xl font-display font-semibold text-status-warning">{pendingTransactions + pendingProfits}</p>
-                <p className="text-xs text-text-secondary mt-1">{pendingTransactions} transactions, {pendingProfits} profits</p>
+                <p className="text-3xl font-display font-semibold text-status-warning">{pendingTx}</p>
+                <p className="text-xs text-text-secondary mt-1">transactions awaiting review</p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
-                <h2 className="text-lg font-semibold text-text-primary mb-4">System Users</h2>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-cream-border">
-                        <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Name</th>
-                        <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Email</th>
-                        <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Status</th>
-                        <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Invested</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-cream-border">
-                      {filteredUsers.slice(0, 5).map(user => (
-                        <tr key={user.id}>
-                          <td className="py-3 text-sm text-text-primary font-medium">{user.name}</td>
-                          <td className="py-3 text-sm text-text-secondary">{user.email}</td>
-                          <td className="py-3">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              user.status === 'active' ? 'bg-status-success/10 text-status-success' :
-                              user.status === 'pending' ? 'bg-status-warning/10 text-status-warning' :
-                              'bg-status-error/10 text-status-error'
-                            }`}>
-                              {user.status}
-                            </span>
-                          </td>
-                          <td className="py-3 text-sm text-text-primary">${user.invested.toLocaleString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-text-primary">Recent Users</h2>
+                  <button onClick={loadUsers} className="text-accent hover:text-accent-hover">
+                    <RefreshCw size={16} />
+                  </button>
                 </div>
+                {usersLoading ? (
+                  <div className="flex justify-center py-6"><Loader2 className="animate-spin text-accent" size={24} /></div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-cream-border">
+                          <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Name</th>
+                          <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Email</th>
+                          <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-cream-border">
+                        {nonAdminUsers.slice(0, 5).map(u => (
+                          <tr key={u.id}>
+                            <td className="py-3 text-sm text-text-primary font-medium">{u.full_name || u.username}</td>
+                            <td className="py-3 text-sm text-text-secondary">{u.email}</td>
+                            <td className="py-3"><StatusBadge status={u.status} /></td>
+                          </tr>
+                        ))}
+                        {nonAdminUsers.length === 0 && (
+                          <tr><td colSpan={3} className="py-6 text-center text-sm text-text-secondary">No users registered yet</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
 
               <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
                 <h2 className="text-lg font-semibold text-text-primary mb-4">Pending Transactions</h2>
                 <div className="space-y-3">
-                  {transactions.filter(t => t.status === 'pending').slice(0, 5).map(tx => (
+                  {pendingTransactions.slice(0, 5).map(tx => (
                     <div key={tx.id} className="flex items-center justify-between p-3 bg-cream-secondary/50 rounded-xl">
                       <div>
-                        <p className="text-sm font-medium text-text-primary">{tx.user}</p>
-                        <p className="text-xs text-text-secondary">{tx.type} - ${tx.amount.toLocaleString()}</p>
+                        <p className="text-sm font-medium text-text-primary">
+                          {tx.profiles?.full_name || tx.profiles?.email || 'Unknown User'}
+                        </p>
+                        <p className="text-xs text-text-secondary">{tx.type} · UGX {tx.amount.toLocaleString()}</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => approveTransaction(tx.id)}
-                          className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20 transition-colors"
-                        >
+                        <button onClick={() => approveTransaction(tx.id)} className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20">
                           <CheckCircle2 size={16} />
                         </button>
-                        <button
-                          onClick={() => rejectTransaction(tx.id)}
-                          className="p-1.5 rounded-lg bg-status-error/10 text-status-error hover:bg-status-error/20 transition-colors"
-                        >
+                        <button onClick={() => rejectTransaction(tx.id)} className="p-1.5 rounded-lg bg-status-error/10 text-status-error hover:bg-status-error/20">
                           <XCircle size={16} />
                         </button>
                       </div>
                     </div>
                   ))}
-                  {transactions.filter(t => t.status === 'pending').length === 0 && (
+                  {pendingTransactions.length === 0 && (
                     <p className="text-sm text-text-secondary text-center py-4">No pending transactions</p>
                   )}
                 </div>
@@ -334,326 +310,236 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* ── USERS ── */}
         {activeTab === 'users' && (
           <div className="space-y-6">
             <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
                 <h2 className="text-lg font-semibold text-text-primary">User Management</h2>
-                <div className="relative">
-                  <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
-                  <input
-                    type="text"
-                    placeholder="Search users..."
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    className="pl-10 pr-4 py-2 bg-cream-secondary border border-cream-border rounded-xl text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
-                  />
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+                    <input
+                      type="text"
+                      placeholder="Search users..."
+                      value={searchTerm}
+                      onChange={e => setSearchTerm(e.target.value)}
+                      className="pl-10 pr-4 py-2 bg-cream-secondary border border-cream-border rounded-xl text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
+                    />
+                  </div>
+                  <button
+                    onClick={loadUsers}
+                    className="p-2 rounded-xl bg-accent/10 hover:bg-accent/20 text-accent transition-colors"
+                    title="Refresh users from Supabase"
+                  >
+                    {usersLoading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
+                  </button>
                 </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-cream-border">
-                      <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Name</th>
-                      <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Email</th>
-                      <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Joined</th>
-                      <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Status</th>
-                      <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Invested</th>
-                      <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Earnings</th>
-                      <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-cream-border">
-                    {filteredUsers.map(user => (
-                      <tr key={user.id}>
-                        <td className="py-4 text-sm font-medium text-text-primary">{user.name}</td>
-                        <td className="py-4 text-sm text-text-secondary">{user.email}</td>
-                        <td className="py-4 text-sm text-text-secondary">{user.joined}</td>
-                        <td className="py-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            user.status === 'active' ? 'bg-status-success/10 text-status-success' :
-                            user.status === 'pending' ? 'bg-status-warning/10 text-status-warning' :
-                            'bg-status-error/10 text-status-error'
-                          }`}>
-                            {user.status}
-                          </span>
-                        </td>
-                        <td className="py-4 text-sm text-text-primary">${user.invested.toLocaleString()}</td>
-                        <td className="py-4 text-sm text-status-success">${user.earnings.toLocaleString()}</td>
-                        <td className="py-4">
-                          <div className="flex items-center gap-2">
-                            {user.status === 'pending' && (
-                              <button
-                                onClick={() => updateUserStatus(user.id, 'active')}
-                                className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20 transition-colors"
-                                title="Approve"
-                              >
-                                <CheckCircle2 size={16} />
-                              </button>
-                            )}
-                            {user.status === 'active' && (
-                              <button
-                                onClick={() => updateUserStatus(user.id, 'suspended')}
-                                className="p-1.5 rounded-lg bg-status-warning/10 text-status-warning hover:bg-status-warning/20 transition-colors"
-                                title="Suspend"
-                              >
-                                <XCircle size={16} />
-                              </button>
-                            )}
-                            {user.status === 'suspended' && (
-                              <button
-                                onClick={() => updateUserStatus(user.id, 'active')}
-                                className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20 transition-colors"
-                                title="Reactivate"
-                              >
-                                <CheckCircle2 size={16} />
-                              </button>
-                            )}
-                            {user.email !== 'primeadministratorwealth@gmail.com' && (
-                              <button
-                                onClick={() => {
-                                  if (window.confirm(`Are you sure you want to delete ${user.name}?`)) {
-                                    deleteUser(user.id)
-                                  }
-                                }}
-                                className="p-1.5 rounded-lg bg-status-error/10 text-status-error hover:bg-status-error/20 transition-colors"
-                                title="Delete User"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            )}
-                          </div>
-                        </td>
+
+              {usersLoading ? (
+                <div className="flex justify-center py-10"><Loader2 className="animate-spin text-accent" size={28} /></div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-cream-border">
+                        {['Name', 'Username', 'Email', 'Role', 'Joined', 'Status', 'Balance', 'Actions'].map(h => (
+                          <th key={h} className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3 pr-4">{h}</th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-cream-border">
+                      {filteredUsers.map(u => (
+                        <tr key={u.id}>
+                          <td className="py-4 text-sm font-medium text-text-primary pr-4 whitespace-nowrap">{u.full_name || '—'}</td>
+                          <td className="py-4 text-sm text-text-secondary pr-4">@{u.username || '—'}</td>
+                          <td className="py-4 text-sm text-text-secondary pr-4">{u.email}</td>
+                          <td className="py-4 pr-4">
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${u.role === 'admin' ? 'bg-accent/10 text-accent' : 'bg-cream-secondary text-text-secondary'}`}>
+                              {u.role}
+                            </span>
+                          </td>
+                          <td className="py-4 text-sm text-text-secondary pr-4 whitespace-nowrap">
+                            {new Date(u.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="py-4 pr-4"><StatusBadge status={u.status} /></td>
+                          <td className="py-4 text-sm text-text-primary pr-4">UGX {(u.balance || 0).toLocaleString()}</td>
+                          <td className="py-4">
+                            <div className="flex items-center gap-2">
+                              {u.status === 'active' && u.role !== 'admin' && (
+                                <button
+                                  onClick={() => updateUserStatus(u.id, 'suspended')}
+                                  className="p-1.5 rounded-lg bg-status-warning/10 text-status-warning hover:bg-status-warning/20 transition-colors"
+                                  title="Suspend"
+                                >
+                                  <XCircle size={16} />
+                                </button>
+                              )}
+                              {u.status === 'suspended' && (
+                                <button
+                                  onClick={() => updateUserStatus(u.id, 'active')}
+                                  className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20 transition-colors"
+                                  title="Reactivate"
+                                >
+                                  <CheckCircle2 size={16} />
+                                </button>
+                              )}
+                              {u.role !== 'admin' && (
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm(`Delete ${u.full_name || u.email}? This cannot be undone.`)) {
+                                      deleteUser(u.id)
+                                    }
+                                  }}
+                                  className="p-1.5 rounded-lg bg-status-error/10 text-status-error hover:bg-status-error/20 transition-colors"
+                                  title="Delete User"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredUsers.length === 0 && (
+                        <tr>
+                          <td colSpan={8} className="py-10 text-center text-text-secondary text-sm">
+                            {searchTerm ? 'No users match your search' : 'No users registered yet'}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
 
+        {/* ── TRANSACTIONS ── */}
         {activeTab === 'transactions' && (
           <div className="space-y-6">
             <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
-              <h2 className="text-lg font-semibold text-text-primary mb-4">Transaction Management</h2>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-cream-border">
-                      <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">User</th>
-                      <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Type</th>
-                      <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Amount</th>
-                      <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Date</th>
-                      <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Status</th>
-                      <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-cream-border">
-                    {transactions.map(tx => (
-                      <tr key={tx.id}>
-                        <td className="py-4 text-sm font-medium text-text-primary">{tx.user}</td>
-                        <td className="py-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            tx.type === 'deposit' ? 'bg-status-success/10 text-status-success' :
-                            tx.type === 'withdrawal' ? 'bg-status-error/10 text-status-error' :
-                            'bg-accent/10 text-accent'
-                          }`}>
-                            {tx.type}
-                          </span>
-                        </td>
-                        <td className="py-4 text-sm text-text-primary">${tx.amount.toLocaleString()}</td>
-                        <td className="py-4 text-sm text-text-secondary">{tx.date}</td>
-                        <td className="py-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            tx.status === 'approved' ? 'bg-status-success/10 text-status-success' :
-                            tx.status === 'rejected' ? 'bg-status-error/10 text-status-error' :
-                            'bg-status-warning/10 text-status-warning'
-                          }`}>
-                            {tx.status}
-                          </span>
-                        </td>
-                        <td className="py-4">
-                          {(tx.status === 'pending' || tx.status === 'approved') && (
-                            <div className="flex items-center gap-2">
-                              {tx.status === 'pending' && (
-                                <button
-                                  onClick={() => approveTransaction(tx.id)}
-                                  className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20 transition-colors"
-                                  title="Approve"
-                                >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-text-primary">Transaction Management</h2>
+                <button onClick={loadTransactions} className="p-2 rounded-xl bg-accent/10 hover:bg-accent/20 text-accent transition-colors">
+                  {txLoading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
+                </button>
+              </div>
+              {txLoading ? (
+                <div className="flex justify-center py-10"><Loader2 className="animate-spin text-accent" size={28} /></div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-cream-border">
+                        {['User', 'Type', 'Amount', 'Provider', 'Date', 'Status', 'Actions'].map(h => (
+                          <th key={h} className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3 pr-4">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-cream-border">
+                      {transactions.map(tx => (
+                        <tr key={tx.id}>
+                          <td className="py-4 text-sm font-medium text-text-primary pr-4 whitespace-nowrap">
+                            {tx.profiles?.full_name || tx.profiles?.email || '—'}
+                          </td>
+                          <td className="py-4 pr-4">
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                              tx.type === 'deposit' ? 'bg-status-success/10 text-status-success' :
+                              tx.type === 'withdrawal' ? 'bg-status-error/10 text-status-error' :
+                              'bg-accent/10 text-accent'
+                            }`}>{tx.type}</span>
+                          </td>
+                          <td className="py-4 text-sm text-text-primary pr-4">UGX {tx.amount.toLocaleString()}</td>
+                          <td className="py-4 text-sm text-text-secondary pr-4">{tx.provider || '—'}</td>
+                          <td className="py-4 text-sm text-text-secondary pr-4 whitespace-nowrap">
+                            {new Date(tx.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="py-4 pr-4"><StatusBadge status={tx.status} /></td>
+                          <td className="py-4">
+                            {tx.status === 'pending' && (
+                              <div className="flex items-center gap-2">
+                                <button onClick={() => approveTransaction(tx.id)} className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20" title="Approve">
                                   <CheckCircle2 size={16} />
                                 </button>
-                              )}
-                              <button
-                                onClick={() => rejectTransaction(tx.id)}
-                                className="p-1.5 rounded-lg bg-status-error/10 text-status-error hover:bg-status-error/20 transition-colors"
-                                title="Reject"
-                              >
-                                <XCircle size={16} />
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {transactions.length === 0 && (
-                  <p className="text-sm text-text-secondary text-center py-6">No transactions in system</p>
-                )}
-              </div>
+                                <button onClick={() => rejectTransaction(tx.id)} className="p-1.5 rounded-lg bg-status-error/10 text-status-error hover:bg-status-error/20" title="Reject">
+                                  <XCircle size={16} />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {transactions.length === 0 && (
+                        <tr><td colSpan={7} className="py-10 text-center text-sm text-text-secondary">No transactions in the system yet</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
 
+        {/* ── PROFITS ── */}
         {activeTab === 'profits' && (
           <div className="space-y-6">
             <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
-              <h2 className="text-lg font-semibold text-text-primary mb-4">Profit Approval</h2>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-cream-border">
-                      <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">User</th>
-                      <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Amount</th>
-                      <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Date</th>
-                      <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Status</th>
-                      <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-cream-border">
-                    {profits.map(profit => (
-                      <tr key={profit.id}>
-                        <td className="py-4 text-sm font-medium text-text-primary">{profit.user}</td>
-                        <td className="py-4 text-sm text-status-success">${profit.amount.toLocaleString()}</td>
-                        <td className="py-4 text-sm text-text-secondary">{profit.date}</td>
-                        <td className="py-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            profit.status === 'approved' ? 'bg-status-success/10 text-status-success' :
-                            profit.status === 'rejected' ? 'bg-status-error/10 text-status-error' :
-                            'bg-status-warning/10 text-status-warning'
-                          }`}>
-                            {profit.status}
-                          </span>
-                        </td>
-                        <td className="py-4">
-                          {(profit.status === 'pending' || profit.status === 'approved') && (
-                            <div className="flex items-center gap-2">
-                              {profit.status === 'pending' && (
-                                <button
-                                  onClick={() => approveProfit(profit.id)}
-                                  className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20 transition-colors"
-                                  title="Approve"
-                                >
-                                  <CheckCircle2 size={16} />
-                                </button>
-                              )}
-                              <button
-                                onClick={() => rejectProfit(profit.id)}
-                                className="p-1.5 rounded-lg bg-status-error/10 text-status-error hover:bg-status-error/20 transition-colors"
-                                title="Reject"
-                              >
-                                <XCircle size={16} />
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {profits.length === 0 && (
-                  <p className="text-sm text-text-secondary text-center py-6">No profits pending approval</p>
+              <h2 className="text-lg font-semibold text-text-primary mb-4">Pending Profit Approvals</h2>
+              <div className="space-y-3">
+                {pendingTransactions.filter(t => t.type === 'earning').map(tx => (
+                  <div key={tx.id} className="flex items-center justify-between p-4 bg-cream-secondary/50 rounded-xl">
+                    <div>
+                      <p className="text-sm font-medium text-text-primary">{tx.profiles?.full_name || tx.profiles?.email || '—'}</p>
+                      <p className="text-xs text-text-secondary">UGX {tx.amount.toLocaleString()} · {new Date(tx.created_at).toLocaleDateString()}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => approveTransaction(tx.id)} className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20" title="Approve">
+                        <CheckCircle2 size={16} />
+                      </button>
+                      <button onClick={() => rejectTransaction(tx.id)} className="p-1.5 rounded-lg bg-status-error/10 text-status-error hover:bg-status-error/20" title="Reject">
+                        <XCircle size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {pendingTransactions.filter(t => t.type === 'earning').length === 0 && (
+                  <p className="text-sm text-text-secondary text-center py-6">No profit approvals pending</p>
                 )}
               </div>
             </div>
           </div>
         )}
 
+        {/* ── SETTINGS ── */}
         {activeTab === 'settings' && (
           <div className="space-y-6">
             <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
               <h2 className="text-lg font-semibold text-text-primary mb-4">System Settings</h2>
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">Daily Earnings Rate (%)</label>
-                  <input
-                    type="number"
-                    defaultValue="1.2"
-                    className="w-full px-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/20"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">Referral Commission - Level 1 (%)</label>
-                  <input
-                    type="number"
-                    defaultValue="5"
-                    className="w-full px-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/20"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">Referral Commission - Level 2 (%)</label>
-                  <input
-                    type="number"
-                    defaultValue="3"
-                    className="w-full px-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/20"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">Referral Commission - Level 3 (%)</label>
-                  <input
-                    type="number"
-                    defaultValue="1"
-                    className="w-full px-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/20"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">Minimum Deposit ($)</label>
-                  <input
-                    type="number"
-                    defaultValue="5"
-                    className="w-full px-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/20"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">Minimum Withdrawal ($)</label>
-                  <input
-                    type="number"
-                    defaultValue="10"
-                  />
-                </div>
+                {[
+                  { label: 'Daily Earnings Rate (%)', defaultValue: '1.2' },
+                  { label: 'Referral Commission - Level 1 (%)', defaultValue: '5' },
+                  { label: 'Referral Commission - Level 2 (%)', defaultValue: '3' },
+                  { label: 'Referral Commission - Level 3 (%)', defaultValue: '1' },
+                  { label: 'Minimum Deposit (UGX)', defaultValue: '10000' },
+                  { label: 'Minimum Withdrawal (UGX)', defaultValue: '20000' },
+                ].map(({ label, defaultValue }) => (
+                  <div key={label}>
+                    <label className="block text-sm font-medium text-text-primary mb-2">{label}</label>
+                    <input
+                      type="number"
+                      defaultValue={defaultValue}
+                      className="w-full px-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/20"
+                    />
+                  </div>
+                ))}
                 <button className="px-6 py-3 bg-accent hover:bg-accent-hover text-white rounded-xl font-medium transition-colors">
                   Save Settings
                 </button>
               </div>
-            </div>
-
-            <div className="bg-status-error/10 rounded-cream-lg border border-status-error/20 p-6">
-              <h2 className="text-lg font-semibold text-status-error mb-2 flex items-center gap-2">
-                <Trash2 size={20} />
-                Purge Test Data & Reset Platform
-              </h2>
-              <p className="text-sm text-text-secondary mb-4">
-                This will delete all test user accounts, mock transactions, and test investment data. Only your Administrator account (<code className="font-mono text-accent">primeadministratorwealth@gmail.com</code>) will be preserved.
-              </p>
-              <button
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to delete all test users and test data? This cannot be undone.')) {
-                    setUsers(initialUsers)
-                    setTransactions([])
-                    setProfits([])
-                    localStorage.removeItem('prime_transactions')
-                    localStorage.removeItem('prime_investments')
-                    localStorage.removeItem('prime_user_balance')
-                    alert('System successfully reset! All test data removed. System is ready for live users.')
-                  }
-                }}
-                className="px-6 py-3 bg-status-error hover:bg-red-700 text-white rounded-xl font-medium transition-colors flex items-center gap-2"
-              >
-                <Trash2 size={18} />
-                Purge All Test Data & Reset System
-              </button>
             </div>
           </div>
         )}

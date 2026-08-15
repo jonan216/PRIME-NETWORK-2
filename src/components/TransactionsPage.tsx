@@ -1,24 +1,49 @@
-import { useState } from 'react'
-import { Search, Filter, ArrowDownToLine, ArrowUpFromLine, TrendingUp, Users, ArrowLeftRight, DollarSign } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Search, Filter, ArrowDownToLine, ArrowUpFromLine, TrendingUp, Users, ArrowLeftRight, DollarSign, Loader2 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import { supabase, mapSupabaseError } from '../lib/supabaseClient'
 
 interface Transaction {
   id: string
-  type: 'deposit' | 'withdrawal' | 'investment' | 'earning' | 'referral_reward' | 'transfer_in' | 'transfer_out'
-  description: string
+  type: string
   amount: number
-  status: 'completed' | 'pending' | 'failed'
-  timestamp: string
+  status: string
+  provider?: string
+  created_at: string
 }
 
-const transactions: Transaction[] = []
-
 export default function TransactionsPage() {
+  const { profile } = useAuth()
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchTransactions() {
+      if (!profile?.id) return
+      setLoading(true)
+
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false })
+
+      if (!error && data) {
+        setTransactions(data)
+      } else if (error) {
+        console.error('Error loading transactions:', mapSupabaseError(error))
+      }
+      setLoading(false)
+    }
+
+    fetchTransactions()
+  }, [profile?.id])
 
   const filtered = transactions.filter(tx => {
     if (filter !== 'all' && tx.type !== filter) return false
-    if (search && !tx.description.toLowerCase().includes(search.toLowerCase())) return false
+    if (search && !(tx.type || '').toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
 
@@ -29,8 +54,6 @@ export default function TransactionsPage() {
       investment: 'Package Investments',
       earning: 'Earnings',
       referral_reward: 'Referral Rewards',
-      transfer_in: 'Transfers In',
-      transfer_out: 'Transfers Out',
     }
     return labels[type] || type
   }
@@ -42,8 +65,6 @@ export default function TransactionsPage() {
       investment: TrendingUp,
       earning: DollarSign,
       referral_reward: Users,
-      transfer_in: ArrowLeftRight,
-      transfer_out: ArrowLeftRight,
     }
     return icons[type] || ArrowLeftRight
   }
@@ -80,72 +101,79 @@ export default function TransactionsPage() {
               <option value="investment">Package Investments</option>
               <option value="earning">Earnings</option>
               <option value="referral_reward">Referral Rewards</option>
-              <option value="transfer_in">Transfers In</option>
-              <option value="transfer_out">Transfers Out</option>
             </select>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-cream-border">
-                <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Date & Time</th>
-                <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Description</th>
-                <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Type</th>
-                <th className="text-right text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Amount</th>
-                <th className="text-right text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-cream-border">
-              {filtered.map(tx => {
-                const Icon = getIcon(tx.type)
-                return (
-                  <tr key={tx.id}>
-                    <td className="py-4 text-sm text-text-secondary">{tx.timestamp}</td>
-                    <td className="py-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                          tx.type === 'deposit' || tx.type === 'transfer_in' ? 'bg-status-success/10' :
-                          tx.type === 'withdrawal' || tx.type === 'transfer_out' ? 'bg-status-error/10' :
-                          'bg-accent/10'
-                        }`}>
-                          <Icon size={18} className={
-                            tx.type === 'deposit' || tx.type === 'transfer_in' ? 'text-status-success' :
-                            tx.type === 'withdrawal' || tx.type === 'transfer_out' ? 'text-status-error' :
-                            'text-accent'
-                          } />
+        {loading ? (
+          <div className="flex justify-center py-12"><Loader2 className="animate-spin text-accent" size={28} /></div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-cream-border">
+                  <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Date & Time</th>
+                  <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Type</th>
+                  <th className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Provider</th>
+                  <th className="text-right text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Amount</th>
+                  <th className="text-right text-xs font-medium text-text-secondary uppercase tracking-wider pb-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-cream-border">
+                {filtered.map(tx => {
+                  const Icon = getIcon(tx.type)
+                  return (
+                    <tr key={tx.id}>
+                      <td className="py-4 text-sm text-text-secondary whitespace-nowrap">
+                        {new Date(tx.created_at).toLocaleString()}
+                      </td>
+                      <td className="py-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                            tx.type === 'deposit' || tx.type === 'earning' ? 'bg-status-success/10' :
+                            tx.type === 'withdrawal' ? 'bg-status-error/10' :
+                            'bg-accent/10'
+                          }`}>
+                            <Icon size={18} className={
+                              tx.type === 'deposit' || tx.type === 'earning' ? 'text-status-success' :
+                              tx.type === 'withdrawal' ? 'text-status-error' :
+                              'text-accent'
+                            } />
+                          </div>
+                          <span className="text-sm font-medium text-text-primary capitalize">{getTypeLabel(tx.type)}</span>
                         </div>
-                        <span className="text-sm font-medium text-text-primary">{tx.description}</span>
-                      </div>
-                    </td>
-                    <td className="py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-accent/10 text-accent">
-                        {getTypeLabel(tx.type)}
-                      </span>
-                    </td>
-                    <td className={`py-4 text-sm font-medium text-right ${
-                      tx.type === 'deposit' || tx.type === 'earning' || tx.type === 'referral_reward' || tx.type === 'transfer_in' 
-                        ? 'text-status-success' : 'text-text-primary'
-                    }`}>
-                      {tx.type === 'deposit' || tx.type === 'earning' || tx.type === 'referral_reward' || tx.type === 'transfer_in' ? '+' : '-'}
-                      ${tx.amount.toLocaleString()}
-                    </td>
-                    <td className="py-4 text-right">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        tx.status === 'completed' ? 'bg-status-success/10 text-status-success' :
-                        tx.status === 'pending' ? 'bg-status-warning/10 text-status-warning' :
-                        'bg-status-error/10 text-status-error'
+                      </td>
+                      <td className="py-4 text-sm text-text-secondary">{tx.provider || '—'}</td>
+                      <td className={`py-4 text-sm font-medium text-right ${
+                        tx.type === 'deposit' || tx.type === 'earning' || tx.type === 'referral_reward' 
+                          ? 'text-status-success' : 'text-text-primary'
                       }`}>
-                        {tx.status}
-                      </span>
+                        {tx.type === 'deposit' || tx.type === 'earning' || tx.type === 'referral_reward' ? '+' : '-'}
+                        UGX {tx.amount.toLocaleString()}
+                      </td>
+                      <td className="py-4 text-right">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          tx.status === 'completed' || tx.status === 'approved' ? 'bg-status-success/10 text-status-success' :
+                          tx.status === 'pending' ? 'bg-status-warning/10 text-status-warning' :
+                          'bg-status-error/10 text-status-error'
+                        }`}>
+                          {tx.status}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-text-secondary text-sm">
+                      No transaction records found.
                     </td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )

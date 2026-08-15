@@ -7,17 +7,28 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, adminOnly }: ProtectedRouteProps) {
-  const { user } = useAuth()
+  const { user, profile, isLoading } = useAuth()
+
+  // While session is being restored, show nothing (avoid flash redirect)
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-cream-primary">
+        <div className="w-8 h-8 border-4 border-accent/30 border-t-accent rounded-full animate-spin" />
+      </div>
+    )
+  }
 
   if (!user) {
     return <Navigate to="/login" replace />
   }
 
-  if (adminOnly && user.role !== 'admin') {
+  const role = profile?.role ?? 'user'
+
+  if (adminOnly && role !== 'admin') {
     return <Navigate to="/dashboard" replace />
   }
 
-  if (!adminOnly && user.role === 'admin') {
+  if (!adminOnly && role === 'admin') {
     return <Navigate to="/admin" replace />
   }
 

@@ -18,7 +18,7 @@ export function getMarzAuthHeaders() {
 
 /**
  * Normalise a Ugandan phone number to E.164 format (+256XXXXXXXXX).
- * Accepts: 07XXXXXXXX, 256XXXXXXXXX, +256XXXXXXXXX, 7XXXXXXXX
+ * Accepts: 07XXXXXXXX, 256XXXXXXXXX, +256XXXXXXXXX
  */
 export function formatPhone(phone) {
   const digits = String(phone).replace(/\D/g, '')
@@ -33,4 +33,58 @@ export function formatPhone(phone) {
     return `+256${digits}`
   }
   return String(phone).startsWith('+') ? String(phone) : `+${digits}`
+}
+
+/**
+ * Initiate a MoMo/Airtel collection.
+ * @param {object} payload
+ * @param {number} payload.amount   Amount in UGX (no conversion done here)
+ * @param {string} payload.phone    Phone number (will be normalised to E.164)
+ * @param {string} payload.provider e.g. 'mtn_momo' | 'airtel_money'
+ * @param {string} [payload.reference]
+ * @param {string} [payload.user_id]
+ */
+export async function initiateCollectMoney(payload) {
+  const response = await axios.post(`${marzConfig.baseUrl}/collect-money`, {
+    amount: Math.round(payload.amount),
+    currency: 'UGX',
+    country: 'UG',
+    phone_number: formatPhone(payload.phone),
+    provider: payload.provider,
+    reference: payload.reference || `PRIME-${Date.now()}`,
+    callback_url: marzConfig.callbackUrl,
+    user_id: payload.user_id,
+  }, { headers: getMarzAuthHeaders() })
+  return response.data
+}
+
+/**
+ * Initiate a MoMo/Airtel disbursement (withdrawal).
+ * @param {object} payload
+ * @param {number} payload.amount   Amount in UGX (no conversion done here)
+ * @param {string} payload.phone    Phone number (will be normalised to E.164)
+ * @param {string} payload.provider e.g. 'mtn_momo' | 'airtel_money'
+ * @param {string} [payload.reference]
+ * @param {string} [payload.user_id]
+ */
+export async function initiateDisburse(payload) {
+  const response = await axios.post(`${marzConfig.baseUrl}/send-money`, {
+    amount: Math.round(payload.amount),
+    currency: 'UGX',
+    country: 'UG',
+    phone_number: formatPhone(payload.phone),
+    provider: payload.provider,
+    reference: payload.reference || `PRIME-WD-${Date.now()}`,
+    callback_url: marzConfig.callbackUrl,
+    user_id: payload.user_id,
+  }, { headers: getMarzAuthHeaders() })
+  return response.data
+}
+
+export async function getTransactionStatus(reference) {
+  const response = await axios.get(
+    `${marzConfig.baseUrl}/transaction/${encodeURIComponent(reference)}`,
+    { headers: getMarzAuthHeaders() }
+  )
+  return response.data
 }

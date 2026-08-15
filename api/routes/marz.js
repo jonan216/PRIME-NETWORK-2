@@ -2,6 +2,7 @@ import { Router } from 'express'
 import axios from 'axios'
 import crypto from 'crypto'
 import { marzConfig, getMarzAuthHeaders, formatPhone } from '../lib/marz.js'
+import { supabaseAdmin } from '../lib/supabaseAdmin.js'
 
 export const marzRouter = Router()
 
@@ -28,14 +29,11 @@ marzRouter.post('/collect-money', async (req, res) => {
     const ugxAmount = Math.round(parseFloat(amount))
     const reference_ = isValidUuid(reference) ? reference : crypto.randomUUID()
 
-    const formattedPhone = formatPhone(phone)
-    console.log('[MARZ] collect-money request -> phone:', formattedPhone, '| provider:', normalizeProvider(provider), '| amount:', ugxAmount)
-
     const payload = {
       amount: ugxAmount,
       currency: 'UGX',
       country: 'UG',
-      phone_number: formattedPhone,   // E.164 e.g. +256781969741
+      phone_number: formatPhone(phone),
       provider: normalizeProvider(provider),
       reference: reference_,
       callback_url: marzConfig.callbackUrl,
@@ -47,6 +45,19 @@ marzRouter.post('/collect-money', async (req, res) => {
     })
 
     const isSandbox = Boolean(response.data?.data?.sandbox_mode || response.data?.sandbox_mode)
+
+    if (user_id) {
+      supabaseAdmin.from('transactions').insert({
+        user_id,
+        type: 'deposit',
+        amount: ugxAmount,
+        status: 'pending',
+        provider: normalizeProvider(provider),
+        reference: reference_,
+      }).then(({ error: txError }) => {
+        if (txError) console.error('[MARZ] failed to create pending deposit tx:', txError.message || txError)
+      })
+    }
 
     return res.status(200).json({
       status: 'initiated',
@@ -88,7 +99,7 @@ marzRouter.post('/disburse', async (req, res) => {
       amount: ugxAmount,
       currency: 'UGX',
       country: 'UG',
-      phone_number: formatPhone(phone),   // E.164 e.g. +256781969741
+      phone_number: formatPhone(phone),
       provider: normalizeProvider(provider),
       reference: reference_,
       callback_url: marzConfig.callbackUrl,
@@ -98,6 +109,19 @@ marzRouter.post('/disburse', async (req, res) => {
     const response = await axios.post(`${marzConfig.baseUrl}/send-money`, payload, {
       headers: getMarzAuthHeaders(),
     })
+
+    if (user_id) {
+      supabaseAdmin.from('transactions').insert({
+        user_id,
+        type: 'withdrawal',
+        amount: ugxAmount,
+        status: 'pending',
+        provider: normalizeProvider(provider),
+        reference: reference_,
+      }).then(({ error: txError }) => {
+        if (txError) console.error('[MARZ] failed to create pending withdrawal tx:', txError.message || txError)
+      })
+    }
 
     return res.status(200).json({
       status: 'initiated',
@@ -144,7 +168,7 @@ marzRouter.get('/transaction/:reference', async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/marz/webhook  — Marz Innovations payment callback
 // ---------------------------------------------------------------------------
-marzRouter.post(['/webhook', '/'], (req, res) => {
+marzRouter.post(['/webhook', '/'], async (req, res) => {
   try {
     const signature = req.headers['x-marz-signature'] || ''
 
@@ -166,6 +190,73 @@ marzRouter.post(['/webhook', '/'], (req, res) => {
 
     const event = req.body
     console.log('[MARZ] webhook event received', event.reference || event.transaction_id, '| status:', event.status)
+
+    const reference = event.reference || event.transaction_id
+    const status = (event.status || '').toLowerCase()
+    const isSuccess = status === 'success' || status === 'completed' || status === 'approved'
+    const isFailed = status === 'failed' || status === 'cancelled' || status === 'rejected'
+    const userId = event.user_id || event.customer_id || null
+
+    if (!reference) {
+      return res.status(200).json({ received: true, note: 'no reference in payload' })
+    }
+
+    if (isSuccess || isFailed) {
+      const { data: existingTx } = await supabaseAdmin
+        .from('transactions')
+        .select('id, status, type, amount, user_id')
+        .eq('reference', reference)
+        .single()
+
+      if (existingTx) {
+        const newStatus = isSuccess ? 'completed' : 'rejected'
+        if (existingTx.status !== newStatus) {
+          await supabaseAdmin
+            .from('transactions')
+            .update({ status: newStatus })
+            .eq('id', existingTx.id)
+
+          if (isSuccess && existingTx.type === 'deposit' && existingTx.user_id) {
+            const { data: profile } = await supabaseAdmin
+              .from('profiles')
+              .select('balance')
+              .eq('id', existingTx.user_id)
+              .single()
+
+            if (profile) {
+              await supabaseAdmin
+                .from('profiles')
+                .update({ balance: (profile.balance || 0) + (existingTx.amount || 0) })
+                .eq('id', existingTx.user_id)
+            }
+          }
+        }
+      } else if (isSuccess && userId) {
+        const { data: profile } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('id', userId)
+          .single()
+
+        if (profile) {
+          const txType = event.direction === 'payout' || event.type === 'send-money' ? 'withdrawal' : 'deposit'
+          const amount = event.amount ? parseFloat(event.amount) : 0
+
+          await supabaseAdmin.from('transactions').insert({
+            user_id: userId,
+            type: txType,
+            amount,
+            status: 'completed',
+            provider: event.provider || event.channel || null,
+            reference,
+          })
+
+          if (txType === 'deposit') {
+            await supabaseAdmin.rpc('increment_balance', { p_user_id: userId, p_amount: amount })
+          }
+        }
+      }
+    }
 
     return res.status(200).json({ received: true })
   } catch (error) {

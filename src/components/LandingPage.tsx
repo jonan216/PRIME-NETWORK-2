@@ -48,18 +48,15 @@ export default function LandingPage() {
     }
 
     setIsSubmitting(true)
-    try {
-      const success = await register(email, password, fullName)
-      if (success) {
-        navigate('/dashboard')
-      } else {
-        setError('Registration failed. Please try again.')
-      }
-    } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.')
-    } finally {
-      setIsSubmitting(false)
+    const result = await register(email, password, fullName, username, referralCode || undefined)
+    setIsSubmitting(false)
+
+    if (!result.success) {
+      setError(result.error || 'Registration failed. Please try again.')
+      return
     }
+
+    navigate('/dashboard')
   }
 
   return (

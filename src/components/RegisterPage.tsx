@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { NavLink, useNavigate, useSearchParams } from 'react-router-dom'
+import { NavLink, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { ChevronRight, Mail, Lock, Eye, EyeOff, Loader2, User, Users } from 'lucide-react'
 
@@ -66,8 +66,8 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [confirmed, setConfirmed] = useState(false)
   const { register } = useAuth()
-  const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -89,19 +89,17 @@ export default function RegisterPage() {
     }
 
     setIsSubmitting(true)
-    try {
-      const success = await register(email, password, fullName)
-      if (success) {
-        navigate('/dashboard')
-      } else {
-        setError('Registration failed. Please try again.')
-      }
-    } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.')
-    } finally {
-      setIsSubmitting(false)
+    const result = await register(email, password, fullName, username, referralCode || undefined)
+    setIsSubmitting(false)
+
+    if (!result.success) {
+      setError(result.error || 'Registration failed. Please try again.')
+      return
     }
+
+    setConfirmed(true)
   }
+
 
   return (
     <div className="min-h-screen bg-cream-primary flex items-center justify-center p-6 sm:p-12 relative overflow-hidden">
@@ -117,6 +115,25 @@ export default function RegisterPage() {
         </div>
 
         <div className="bg-cream-card border border-cream-border rounded-cream-lg shadow-cream p-8 sm:p-10">
+          {confirmed ? (
+            <div className="text-center py-6">
+              <div className="w-16 h-16 rounded-full bg-status-success/10 flex items-center justify-center mx-auto mb-4">
+                <Mail size={32} className="text-status-success" />
+              </div>
+              <h2 className="font-display text-2xl text-text-primary mb-2">Check Your Email!</h2>
+              <p className="text-text-secondary text-sm mb-6">
+                We sent a confirmation link to <span className="font-semibold text-text-primary">{email}</span>.
+                Click the link to activate your account, then sign in.
+              </p>
+              <NavLink
+                to="/login"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-accent hover:bg-accent-hover text-white font-semibold rounded-xl transition-colors"
+              >
+                Go to Sign In <ChevronRight size={18} />
+              </NavLink>
+            </div>
+          ) : (
+            <>
           <div className="mb-8">
             <h2 className="font-display text-3xl text-text-primary mb-2">Create Your Account</h2>
             <p className="text-text-secondary text-sm">Join thousands of investors worldwide</p>
@@ -223,6 +240,8 @@ export default function RegisterPage() {
               </NavLink>
             </p>
           </div>
+            </>
+          )}
         </div>
       </div>
     </div>

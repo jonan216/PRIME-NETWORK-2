@@ -1,22 +1,72 @@
+import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
-import { DollarSign, TrendingUp, Wallet, Users, ArrowDownToLine, Plus } from 'lucide-react'
+import { DollarSign, TrendingUp, Wallet, Users, ArrowDownToLine, Plus, Loader2 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import { supabase, mapSupabaseError } from '../lib/supabaseClient'
 
-const stats = [
-  { label: 'Available Balance', value: '$0.00', icon: Wallet, color: 'text-accent' },
-  { label: 'Total Invested', value: '$0.00', icon: TrendingUp, color: 'text-text-primary' },
-  { label: 'Total Daily Earnings', value: '$0.00', icon: DollarSign, color: 'text-status-success' },
-  { label: 'Referral Earnings', value: '$0.00', icon: Users, color: 'text-accent' },
-]
+interface Transaction {
+  id: string
+  type: string
+  amount: number
+  status: string
+  created_at: string
+}
 
-const recentActivity: Array<{ id: number; title: string; desc: string; time: string; icon: any }> = []
-const activePackages: Array<{ id: number; name: string; rate: string; invested: number; earned: number; status: string }> = []
+interface Investment {
+  id: string
+  plan_name: string
+  amount: number
+  daily_roi: number
+  status: string
+}
 
 export default function DashboardHome() {
+  const { profile } = useAuth()
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [investments, setInvestments] = useState<Investment[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadDashboardData() {
+      if (!profile?.id) return
+      setLoading(true)
+
+      const [txRes, invRes] = await Promise.all([
+        supabase.from('transactions').select('*').eq('user_id', profile.id).order('created_at', { ascending: false }).limit(5),
+        supabase.from('investments').select('*').eq('user_id', profile.id).order('created_at', { ascending: false })
+      ])
+
+      if (txRes.error) {
+        console.error('Error loading transactions:', mapSupabaseError(txRes.error))
+      } else if (txRes.data) {
+        setTransactions(txRes.data)
+      }
+      if (invRes.error) {
+        console.error('Error loading investments:', mapSupabaseError(invRes.error))
+      } else if (invRes.data) {
+        setInvestments(invRes.data)
+      }
+      setLoading(false)
+    }
+
+    loadDashboardData()
+  }, [profile?.id])
+
+  const availableBalance = profile?.balance ?? 0
+  const totalInvested = investments.reduce((sum, inv) => sum + (inv.amount || 0), 0)
+
+  const stats = [
+    { label: 'Available Balance', value: `UGX ${availableBalance.toLocaleString()}`, icon: Wallet, color: 'text-accent' },
+    { label: 'Total Invested', value: `UGX ${totalInvested.toLocaleString()}`, icon: TrendingUp, color: 'text-text-primary' },
+    { label: 'Active Packages', value: `${investments.filter(i => i.status === 'active').length}`, icon: DollarSign, color: 'text-status-success' },
+    { label: 'KYC Status', value: profile?.kyc_verified ? 'Verified' : 'Unverified', icon: Users, color: profile?.kyc_verified ? 'text-status-success' : 'text-status-warning' },
+  ]
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-3xl font-bold text-text-primary">Overview</h1>
-        <p className="text-text-secondary mt-1">Welcome back! Here's what's happening with your account.</p>
+        <p className="text-text-secondary mt-1">Welcome back, {profile?.full_name || profile?.username || 'Investor'}! Here's what's happening with your account.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -34,23 +84,29 @@ export default function DashboardHome() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-cream-card rounded-cream-lg border border-cream-border p-6">
           <h2 className="text-lg font-semibold text-text-primary mb-4">Recent Activity</h2>
-          <div className="space-y-4">
-            {recentActivity.map(activity => (
-              <div key={activity.id} className="flex items-center gap-4 p-4 bg-cream-secondary/50 rounded-xl">
-                <div className="h-10 w-10 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0">
-                  <activity.icon size={18} className="text-accent" />
+          {loading ? (
+            <div className="flex justify-center py-8"><Loader2 className="animate-spin text-accent" size={24} /></div>
+          ) : (
+            <div className="space-y-4">
+              {transactions.map(activity => (
+                <div key={activity.id} className="flex items-center gap-4 p-4 bg-cream-secondary/50 rounded-xl">
+                  <div className="h-10 w-10 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0">
+                    <Wallet size={18} className="text-accent" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-text-primary capitalize">{activity.type}</p>
+                    <p className="text-xs text-text-secondary">UGX {activity.amount.toLocaleString()} · Status: {activity.status}</p>
+                  </div>
+                  <span className="text-xs text-text-secondary flex-shrink-0">
+                    {new Date(activity.created_at).toLocaleDateString()}
+                  </span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-text-primary">{activity.title}</p>
-                  <p className="text-xs text-text-secondary">{activity.desc}</p>
-                </div>
-                <span className="text-xs text-text-secondary flex-shrink-0">{activity.time}</span>
-              </div>
-            ))}
-            {recentActivity.length === 0 && (
-              <p className="text-sm text-text-secondary text-center py-8">No recent activity</p>
-            )}
-          </div>
+              ))}
+              {transactions.length === 0 && (
+                <p className="text-sm text-text-secondary text-center py-8">No recent activity</p>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -83,23 +139,27 @@ export default function DashboardHome() {
 
           <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
             <h2 className="text-lg font-semibold text-text-primary mb-4">Active Packages</h2>
-            <div className="space-y-3">
-              {activePackages.map(pkg => (
-                <div key={pkg.id} className="flex items-center justify-between p-3 bg-cream-secondary/50 rounded-xl">
-                  <div>
-                    <p className="text-sm font-medium text-text-primary">{pkg.name}</p>
-                    <p className="text-xs text-text-secondary">Rate: {pkg.rate}</p>
+            {loading ? (
+              <div className="flex justify-center py-4"><Loader2 className="animate-spin text-accent" size={20} /></div>
+            ) : (
+              <div className="space-y-3">
+                {investments.map(pkg => (
+                  <div key={pkg.id} className="flex items-center justify-between p-3 bg-cream-secondary/50 rounded-xl">
+                    <div>
+                      <p className="text-sm font-medium text-text-primary">{pkg.plan_name}</p>
+                      <p className="text-xs text-text-secondary">Daily ROI: {pkg.daily_roi}%</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-accent">UGX {pkg.amount.toLocaleString()}</p>
+                      <span className="text-[10px] uppercase font-semibold text-status-success">{pkg.status}</span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-status-success">+${pkg.earned.toFixed(2)}</p>
-                    <p className="text-xs text-text-secondary">${pkg.invested.toLocaleString()} invested</p>
-                  </div>
-                </div>
-              ))}
-              {activePackages.length === 0 && (
-                <p className="text-sm text-text-secondary text-center py-4">No active investment packages</p>
-              )}
-            </div>
+                ))}
+                {investments.length === 0 && (
+                  <p className="text-sm text-text-secondary text-center py-4">No active investment packages</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

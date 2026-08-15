@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { ADMIN_EMAIL } from '../context/AuthContext'
 import { ChevronRight, User, Lock, Eye, EyeOff, Loader2, UserPlus } from 'lucide-react'
 
 interface InputFieldProps {
@@ -63,23 +64,19 @@ export default function LoginPage() {
     }
 
     setIsSubmitting(true)
-    try {
-      const success = await login(identifier, password)
-      if (success) {
-        const cleanId = identifier.trim().toLowerCase()
-        const storedUser = JSON.parse(localStorage.getItem('prime_user') || '{}')
-        if (storedUser.role === 'admin' || cleanId === 'primeadministratorwealth@gmail.com' || cleanId === 'admin') {
-          navigate('/admin')
-        } else {
-          navigate('/dashboard')
-        }
-      } else {
-        setError('Invalid username/email or password')
-      }
-    } catch (err: any) {
-      setError(err.message || 'Login failed. Please try again.')
-    } finally {
-      setIsSubmitting(false)
+    const result = await login(identifier, password)
+    setIsSubmitting(false)
+
+    if (!result.success) {
+      setError(result.error || 'Invalid username/email or password')
+      return
+    }
+
+    const cleanId = identifier.trim().toLowerCase()
+    if (cleanId === ADMIN_EMAIL) {
+      navigate('/admin')
+    } else {
+      setTimeout(() => navigate('/dashboard'), 200)
     }
   }
 
@@ -190,7 +187,6 @@ export default function LoginPage() {
                   Register
                 </NavLink>
               </p>
-
             </div>
           </div>
         </div>

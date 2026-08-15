@@ -16,7 +16,7 @@ interface Withdrawal {
 const mockWithdrawals: Withdrawal[] = []
 
 export default function WithdrawPage() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [amount, setAmount] = useState('')
   const [provider, setProvider] = useState<'mtn_momo' | 'airtel_money' | 'bank_transfer'>('mtn_momo')
   const [phone, setPhone] = useState('')
@@ -109,8 +109,7 @@ export default function WithdrawPage() {
               <>
                 <div className="mb-6">
                   <p className="text-sm text-text-secondary mb-1">Available Balance</p>
-                  <p className="text-4xl font-display font-semibold text-accent">${(user?.balance ?? 0).toFixed(2)} USD</p>
-                  <p className="text-xs text-text-secondary mt-1">≈ UGX {((user?.balance ?? 0) * 3700).toLocaleString('en-US')}</p>
+                  <p className="text-4xl font-display font-semibold text-accent">UGX {((profile?.balance ?? 0)).toLocaleString('en-US')}</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
@@ -122,9 +121,9 @@ export default function WithdrawPage() {
                         type="number"
                         value={amount}
                         onChange={e => setAmount(e.target.value)}
-                        placeholder="18500"
+                        placeholder="10000"
                         required
-                        min={18500}
+                        min={10000}
                         className="w-full pl-14 pr-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
                       />
                     </div>

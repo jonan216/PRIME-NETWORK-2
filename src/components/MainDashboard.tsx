@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, Navigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import {
   LayoutDashboard,
   TrendingUp,
@@ -36,9 +37,14 @@ const mobileBottomNav = [
 export default function MainDashboard() {
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const { logout, profile } = useAuth()
 
-  const handleLogout = () => {
-    localStorage.removeItem('prime_user')
+  if (profile?.role === 'admin') {
+    return <Navigate to="/admin" replace />
+  }
+
+  const handleLogout = async () => {
+    await logout()
     window.location.href = '/login'
   }
 
