@@ -53,37 +53,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data as Profile
   }
 
-  const createMissingProfile = async (user: SupabaseUser) => {
-    const { data: existing } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', user.id)
-      .single()
-
-    if (existing) return
-
-    const email = user.email?.toLowerCase() || ''
-    const role = email === ADMIN_EMAIL ? 'admin' : 'user'
-    const fullName = (user.user_metadata?.full_name as string) || (user.user_metadata?.name as string) || ''
-    const username = (user.user_metadata?.username as string) || email.split('@')[0] || ''
-
-    const { error } = await supabase.from('profiles').insert({
-      id: user.id,
-      email,
-      full_name: fullName,
-      username: username.toLowerCase(),
-      role,
-      referred_by: (user.user_metadata?.referred_by as string) || null,
-      balance: 0,
-      kyc_verified: false,
-      status: 'active',
-    })
-
-    if (error) {
-      console.error('Error creating missing profile:', mapSupabaseError(error))
-    }
-  }
-
   const refreshProfile = async () => {
     if (user) {
       const p = await fetchProfile(user.id)
@@ -98,11 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null)
       if (session?.user) {
         const p = await fetchProfile(session.user.id)
-        if (!p) {
-          await createMissingProfile(session.user)
-        }
-        const refreshed = await fetchProfile(session.user.id)
-        setProfile(refreshed)
+        setProfile(p)
       }
       setIsLoading(false)
     })
@@ -113,11 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null)
       if (session?.user) {
         const p = await fetchProfile(session.user.id)
-        if (!p) {
-          await createMissingProfile(session.user)
-        }
-        const refreshed = await fetchProfile(session.user.id)
-        setProfile(refreshed)
+        setProfile(p)
       } else {
         setProfile(null)
       }
@@ -168,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: false, error: 'Username already taken. Please choose another.' }
     }
 
-    const { data, error } = await supabase.auth.signUp({ 
+    const { error } = await supabase.auth.signUp({ 
       email: cleanEmail, 
       password,
       options: {
@@ -182,25 +143,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) {
       setIsLoading(false)
       return { success: false, error: mapSupabaseError(error) }
-    }
-
-    if (data.user) {
-      const role = cleanEmail === ADMIN_EMAIL ? 'admin' : 'user'
-      const { error: profileError } = await supabase.from('profiles').insert({
-        id: data.user.id,
-        email: cleanEmail,
-        full_name: fullName,
-        username: cleanUsername,
-        role,
-        referred_by: referredBy || null,
-        balance: 0,
-        kyc_verified: false,
-        status: 'active',
-      })
-
-      if (profileError) {
-        console.error('Profile creation error:', mapSupabaseError(profileError))
-      }
     }
 
     setIsLoading(false)
