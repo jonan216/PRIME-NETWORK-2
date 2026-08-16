@@ -4,7 +4,7 @@ import { initiateWithdrawal, getTransactionStatus } from '../lib/marzApi'
 import { useAuth } from '../context/AuthContext'
 import { formatDualCurrency } from '../lib/currency'
 
-type PaymentStatus = 'idle' | 'pending' | 'waiting' | 'completed' | 'failed'
+type PaymentStatus = 'idle' | 'pending' | 'waiting' | 'pending_approval' | 'completed' | 'failed'
 
 interface Withdrawal {
   id: string

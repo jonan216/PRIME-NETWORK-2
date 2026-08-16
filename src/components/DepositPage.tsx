@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { ShieldCheck, Wallet, Building2, CreditCard, ArrowRight, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { initiateDeposit, getTransactionStatus } from '../lib/marzApi'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabaseClient'
 import { formatDualCurrency } from '../lib/currency'
 
 
-type PaymentStatus = 'idle' | 'pending' | 'waiting' | 'completed' | 'failed'
+type PaymentStatus = 'idle' | 'pending' | 'waiting' | 'pending_approval' | 'completed' | 'failed'
 
 export default function DepositPage() {
   const { user, profile, refreshProfile } = useAuth()
@@ -79,9 +80,31 @@ export default function DepositPage() {
           ).toLowerCase()
 
           if (['credited', 'completed', 'successful', 'paid', 'success', 'sandbox'].includes(txStatus)) {
-            setStatus('completed')
             clearInterval(interval)
-            refreshProfile()
+            setStatus('pending_approval')
+
+            const approvalInterval = setInterval(async () => {
+              try {
+                const { data } = await supabase
+                  .from('transactions')
+                  .select('status')
+                  .eq('reference', txRef)
+                  .single()
+
+                if (data?.status === 'approved') {
+                  clearInterval(approvalInterval)
+                  setStatus('completed')
+                  refreshProfile()
+                } else if (data?.status === 'rejected') {
+                  clearInterval(approvalInterval)
+                  setStatus('failed')
+                }
+              } catch {
+                // keep polling
+              }
+            }, 3000)
+
+            setTimeout(() => clearInterval(approvalInterval), 180000)
           } else if (['failed', 'rejected', 'cancelled', 'expired'].includes(txStatus)) {
             setStatus('failed')
             clearInterval(interval)
@@ -125,6 +148,20 @@ export default function DepositPage() {
                   className="px-6 py-3 bg-accent hover:bg-accent-hover text-white rounded-xl font-medium transition-colors"
                 >
                   Make Another Deposit
+                </button>
+              </div>
+            ) : status === 'pending_approval' ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="w-16 h-16 rounded-full bg-status-warning/10 flex items-center justify-center mb-4">
+                  <Loader2 size={32} className="text-status-warning animate-spin" />
+                </div>
+                <h3 className="text-xl font-semibold text-text-primary mb-2">Awaiting Admin Approval</h3>
+                <p className="text-text-secondary mb-6">Your payment has been received. An administrator will approve it shortly.</p>
+                <button
+                  onClick={() => { setStatus('idle'); setAmount(''); setPhone('') }}
+                  className="px-6 py-3 bg-cream-secondary hover:bg-cream-border text-text-primary rounded-xl font-medium transition-colors"
+                >
+                  Cancel
                 </button>
               </div>
             ) : (
