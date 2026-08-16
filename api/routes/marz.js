@@ -72,7 +72,15 @@ marzRouter.post('/collect-money', async (req, res) => {
     })
   } catch (error) {
     const errData = error.response?.data || {}
-    console.error('[MARZ] collect-money error', errData || error.message)
+    console.error('[MARZ] collect-money error', {
+      message: errData.message || error.message,
+      status: error.response?.status,
+      baseUrl: marzConfig.baseUrl,
+      apiKeyPrefix: marzConfig.apiKey ? marzConfig.apiKey.slice(0, 6) + '...' : 'MISSING',
+      apiSecretPrefix: marzConfig.apiSecret ? marzConfig.apiSecret.slice(0, 6) + '...' : 'MISSING',
+      callbackUrl: marzConfig.callbackUrl,
+      fullError: errData,
+    })
 
     return res.status(500).json({
       message: errData.message || 'Failed to initiate payment',
@@ -146,8 +154,30 @@ marzRouter.post('/disburse', async (req, res) => {
 })
 
 // ---------------------------------------------------------------------------
-// GET /api/marz/transaction/:reference  — Poll transaction status
+// GET /api/marz/health  — diagnostic + Marz credentials check
 // ---------------------------------------------------------------------------
+marzRouter.get('/health', async (req, res) => {
+  try {
+    const response = await axios.get(`${marzConfig.baseUrl}/transaction/test-credentials`, {
+      headers: getMarzAuthHeaders(),
+    })
+    return res.status(200).json({
+      status: 'ok',
+      marz: response.data,
+    })
+  } catch (error) {
+    const errData = error.response?.data || {}
+    console.error('[MARZ] health check error', errData || error.message)
+    return res.status(500).json({
+      status: 'error',
+      message: errData.message || 'Marz credentials check failed',
+      baseUrl: marzConfig.baseUrl,
+      apiKeyPrefix: marzConfig.apiKey ? marzConfig.apiKey.slice(0, 6) + '...' : 'MISSING',
+      apiSecretPrefix: marzConfig.apiSecret ? marzConfig.apiSecret.slice(0, 6) + '...' : 'MISSING',
+      details: errData,
+    })
+  }
+})
 marzRouter.get('/transaction/:reference', async (req, res) => {
   try {
     const { reference } = req.params
