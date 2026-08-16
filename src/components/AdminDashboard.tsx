@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Shield, Users, ArrowLeftRight, TrendingUp, CheckCircle2, XCircle, Search, Settings, BarChart3, Trash2, RefreshCw, Loader2 } from 'lucide-react'
+import { Shield, Users, ArrowLeftRight, TrendingUp, CheckCircle2, XCircle, Search, Settings, BarChart3, Trash2, RefreshCw, Loader2, Bell } from 'lucide-react'
 import { supabase, mapSupabaseError } from '../lib/supabaseClient'
 import { formatDualCurrency } from '../lib/currency'
 
@@ -35,6 +35,7 @@ export default function AdminDashboard() {
   const [usersLoading, setUsersLoading] = useState(false)
   const [txLoading, setTxLoading] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [notification, setNotification] = useState<string | null>(null)
 
   // ─── Data loaders ─────────────────────────────────────────────
   const loadUsers = useCallback(async () => {
@@ -68,6 +69,28 @@ export default function AdminDashboard() {
   // Load on mount and on tab change
   useEffect(() => { loadUsers() }, [loadUsers])
   useEffect(() => { loadTransactions() }, [loadTransactions])
+
+  // Real-time notification for new deposits
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-deposit-notifications')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'transactions',
+        filter: "type=eq.deposit"
+      }, (payload) => {
+        const newTx = payload.new as Transaction
+        if (newTx.status === 'pending' || newTx.status === 'pending_approval') {
+          setNotification(`New deposit of ${formatDualCurrency(newTx.amount)} from a user needs approval`)
+          setTransactions(prev => [newTx, ...prev])
+          setTimeout(() => setNotification(null), 5000)
+        }
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
   // ─── Actions ──────────────────────────────────────────────────
   const updateUserStatus = async (userId: string, status: string) => {
@@ -180,6 +203,8 @@ export default function AdminDashboard() {
   )
 
   const pendingTransactions = transactions.filter(t => t.status === 'pending' || t.status === 'pending_approval')
+  const pendingDeposits = transactions.filter(t => t.type === 'deposit' && (t.status === 'pending' || t.status === 'pending_approval'))
+  const pendingDepositsCount = pendingDeposits.length
 
   // ─── Shared status badge ──────────────────────────────────────
   const StatusBadge = ({ status }: { status: string }) => (
@@ -197,18 +222,26 @@ export default function AdminDashboard() {
     { id: 'overview', label: 'Overview', Icon: BarChart3 },
     { id: 'users', label: 'Users', Icon: Users },
     { id: 'transactions', label: 'Transactions', Icon: ArrowLeftRight },
+    { id: 'deposit-approvals', label: 'Deposit Approvals', Icon: CheckCircle2, badge: pendingDepositsCount },
     { id: 'profits', label: 'Profit Approval', Icon: TrendingUp },
     { id: 'settings', label: 'Settings', Icon: Settings },
   ]
 
-  const NavButton = ({ id, label, Icon }: { id: string; label: string; Icon: React.ElementType }) => (
+  const NavButton = ({ id, label, Icon, badge }: { id: string; label: string; Icon: React.ElementType; badge?: number }) => (
     <button
       onClick={() => { setActiveTab(id); setMobileMenuOpen(false) }}
       className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
         activeTab === id ? 'bg-nav-active text-nav-active-text' : 'text-cream-primary/70 hover:bg-nav-hover'
       }`}
     >
-      <Icon size={18} />
+      <div className="relative">
+        <Icon size={18} />
+        {badge !== undefined && badge > 0 && (
+          <span className="absolute -top-1 -right-1.5 bg-status-error text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+            {badge > 9 ? '9+' : badge}
+          </span>
+        )}
+      </div>
       {label}
     </button>
   )
@@ -276,6 +309,13 @@ export default function AdminDashboard() {
 
       <main className="flex-1 md:ml-[260px] p-4 sm:p-6 md:p-8">
         <h1 className="font-display text-3xl font-semibold text-text-primary mb-8">Admin Dashboard</h1>
+
+        {notification && (
+          <div className="mb-6 p-4 bg-status-warning/10 border border-status-warning/20 rounded-xl flex items-center gap-3 animate-pulse">
+            <Bell size={20} className="text-status-warning" />
+            <p className="text-sm font-medium text-text-primary">{notification}</p>
+          </div>
+        )}
 
         {/* ── OVERVIEW ── */}
         {activeTab === 'overview' && (
@@ -556,6 +596,66 @@ export default function AdminDashboard() {
                       ))}
                       {transactions.length === 0 && (
                         <tr><td colSpan={7} className="py-10 text-center text-sm text-text-secondary">No transactions in the system yet</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── DEPOSIT APPROVALS ── */}
+        {activeTab === 'deposit-approvals' && (
+          <div className="space-y-6">
+            <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-text-primary">Deposit Approvals</h2>
+                <button onClick={loadTransactions} className="p-2 rounded-xl bg-accent/10 hover:bg-accent/20 text-accent transition-colors">
+                  {txLoading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
+                </button>
+              </div>
+              {txLoading ? (
+                <div className="flex justify-center py-10"><Loader2 className="animate-spin text-accent" size={28} /></div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-cream-border">
+                        {['User', 'Amount', 'Provider', 'Reference', 'Date', 'Status', 'Actions'].map(h => (
+                          <th key={h} className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3 pr-4">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-cream-border">
+                      {pendingDeposits.map(tx => (
+                        <tr key={tx.id}>
+                          <td className="py-4 text-sm font-medium text-text-primary pr-4 whitespace-nowrap">
+                            {tx.profiles?.full_name || tx.profiles?.email || '—'}
+                          </td>
+                          <td className="py-4 text-sm text-text-primary pr-4">{formatDualCurrency(tx.amount)}</td>
+                          <td className="py-4 text-sm text-text-secondary pr-4">{tx.provider || '—'}</td>
+                          <td className="py-4 text-sm text-text-secondary pr-4 whitespace-nowrap font-mono text-xs">
+                            {tx.reference || '—'}
+                          </td>
+                          <td className="py-4 text-sm text-text-secondary pr-4 whitespace-nowrap">
+                            {new Date(tx.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="py-4 pr-4"><StatusBadge status={tx.status} /></td>
+                          <td className="py-4">
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => approveTransaction(tx.id, tx.type)} className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20" title="Approve">
+                                <CheckCircle2 size={16} />
+                              </button>
+                              <button onClick={() => rejectTransaction(tx.id)} className="p-1.5 rounded-lg bg-status-error/10 text-status-error hover:bg-status-error/20" title="Reject">
+                                <XCircle size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {pendingDeposits.length === 0 && (
+                        <tr><td colSpan={7} className="py-10 text-center text-sm text-text-secondary">No pending deposits awaiting approval</td></tr>
                       )}
                     </tbody>
                   </table>
