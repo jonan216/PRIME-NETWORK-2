@@ -230,6 +230,21 @@ marzRouter.post(['/webhook', '/'], async (req, res) => {
                 .eq('id', existingTx.user_id)
             }
           }
+
+          if (isSuccess && existingTx.type === 'withdrawal' && existingTx.user_id) {
+            const { data: profile } = await supabaseAdmin
+              .from('profiles')
+              .select('balance')
+              .eq('id', existingTx.user_id)
+              .single()
+
+            if (profile) {
+              await supabaseAdmin
+                .from('profiles')
+                .update({ balance: Math.max(0, (profile.balance || 0) - (existingTx.amount || 0)) })
+                .eq('id', existingTx.user_id)
+            }
+          }
         }
       } else if (isSuccess && userId) {
         const { data: profile } = await supabaseAdmin
@@ -253,6 +268,21 @@ marzRouter.post(['/webhook', '/'], async (req, res) => {
 
           if (txType === 'deposit') {
             await supabaseAdmin.rpc('increment_balance', { p_user_id: userId, p_amount: amount })
+          }
+
+          if (txType === 'withdrawal') {
+            const { data: profile } = await supabaseAdmin
+              .from('profiles')
+              .select('balance')
+              .eq('id', userId)
+              .single()
+
+            if (profile) {
+              await supabaseAdmin
+                .from('profiles')
+                .update({ balance: Math.max(0, (profile.balance || 0) - amount) })
+                .eq('id', userId)
+            }
           }
         }
       }

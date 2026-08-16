@@ -2,12 +2,13 @@ import { useState } from 'react'
 import { ShieldCheck, Wallet, Building2, CreditCard, ArrowRight, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { initiateDeposit, getTransactionStatus } from '../lib/marzApi'
 import { useAuth } from '../context/AuthContext'
+import { formatDualCurrency } from '../lib/currency'
 
 
 type PaymentStatus = 'idle' | 'pending' | 'waiting' | 'completed' | 'failed'
 
 export default function DepositPage() {
-  const { user } = useAuth()
+  const { user, profile, refreshProfile } = useAuth()
   const [amount, setAmount] = useState('')
   const [provider, setProvider] = useState<'mtn_momo' | 'airtel_money' | 'visa' | 'mastercard' | 'bank_transfer'>('mtn_momo')
   const [phone, setPhone] = useState('')
@@ -80,6 +81,7 @@ export default function DepositPage() {
           if (['credited', 'completed', 'successful', 'paid', 'success', 'sandbox'].includes(txStatus)) {
             setStatus('completed')
             clearInterval(interval)
+            refreshProfile()
           } else if (['failed', 'rejected', 'cancelled', 'expired'].includes(txStatus)) {
             setStatus('failed')
             clearInterval(interval)
@@ -244,6 +246,11 @@ export default function DepositPage() {
           <div className="space-y-6">
             <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
               <h3 className="text-lg font-semibold text-text-primary mb-4">Deposit Information</h3>
+
+              <div className="bg-cream-soft rounded-xl p-4 border border-cream-border mb-4">
+                <p className="text-xs font-medium text-text-secondary mb-1">Current Wallet Balance</p>
+                <p className="text-xl font-bold text-accent">{formatDualCurrency(profile?.balance ?? 0)}</p>
+              </div>
 
               {selectedProvider && (
                 <div className="flex items-center gap-3 mb-4">

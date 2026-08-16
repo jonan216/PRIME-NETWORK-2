@@ -17,7 +17,7 @@ interface Withdrawal {
 const mockWithdrawals: Withdrawal[] = []
 
 export default function WithdrawPage() {
-  const { user, profile } = useAuth()
+  const { user, profile, refreshProfile } = useAuth()
   const [amount, setAmount] = useState('')
   const [provider, setProvider] = useState<'mtn_momo' | 'airtel_money' | 'bank_transfer'>('mtn_momo')
   const [phone, setPhone] = useState('')
@@ -68,6 +68,7 @@ export default function WithdrawPage() {
           if (txStatus === 'credited' || txStatus === 'completed') {
             setStatus('completed')
             clearInterval(interval)
+            refreshProfile()
           } else if (txStatus === 'failed' || txStatus === 'rejected') {
             setStatus('failed')
             clearInterval(interval)
