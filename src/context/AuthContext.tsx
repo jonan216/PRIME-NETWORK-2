@@ -30,8 +30,9 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const ADMIN_EMAIL = 'primenetworkadministrator@gmail.com'
+const ADMIN_USERNAME = 'admin@primenetwork'
 
-export { ADMIN_EMAIL }
+export { ADMIN_EMAIL, ADMIN_USERNAME }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SupabaseUser | null>(null)
@@ -91,8 +92,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true)
 
     let email = identifier.trim()
+    const lowerId = email.toLowerCase()
 
-    if (!email.includes('@')) {
+    if (lowerId === ADMIN_USERNAME) {
+      email = ADMIN_EMAIL
+    } else if (!email.includes('@')) {
       const { data, error: rpcError } = await supabase.rpc('get_email_by_username', { p_username: email.toLowerCase() })
       if (rpcError || !data || data.length === 0) {
         setIsLoading(false)

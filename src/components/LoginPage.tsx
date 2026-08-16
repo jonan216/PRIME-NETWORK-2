@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { ADMIN_EMAIL } from '../context/AuthContext'
+import { ADMIN_EMAIL, ADMIN_USERNAME } from '../context/AuthContext'
 import { ChevronRight, User, Lock, Eye, EyeOff, Loader2, UserPlus } from 'lucide-react'
 
 interface InputFieldProps {
@@ -73,7 +73,7 @@ export default function LoginPage() {
     }
 
     const cleanId = identifier.trim().toLowerCase()
-    if (cleanId === ADMIN_EMAIL) {
+    if (cleanId === ADMIN_EMAIL || cleanId === ADMIN_USERNAME) {
       navigate('/admin')
     } else {
       setTimeout(() => navigate('/dashboard'), 200)
