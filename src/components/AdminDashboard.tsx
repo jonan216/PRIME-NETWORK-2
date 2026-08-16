@@ -28,7 +28,7 @@ interface Transaction {
 }
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState('deposit-approvals')
   const [users, setUsers] = useState<Profile[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -400,6 +400,41 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </div>
+
+            {pendingDeposits.length > 0 && (
+              <div className="bg-cream-card rounded-cream-lg border border-status-warning/30 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+                    <Bell size={20} className="text-status-warning" />
+                    Pending Deposit Approvals
+                  </h2>
+                  <button
+                    onClick={() => setActiveTab('deposit-approvals')}
+                    className="text-sm font-medium text-accent hover:text-accent-hover"
+                  >
+                    View All
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {pendingDeposits.slice(0, 5).map(tx => (
+                    <div key={tx.id} className="flex items-center justify-between p-4 bg-cream-secondary/50 rounded-xl">
+                      <div>
+                        <p className="text-sm font-medium text-text-primary">{tx.profiles?.full_name || tx.profiles?.email || '—'}</p>
+                        <p className="text-xs text-text-secondary">{formatDualCurrency(tx.amount)} · {new Date(tx.created_at).toLocaleDateString()}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => approveTransaction(tx.id, tx.type)} className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20" title="Approve">
+                          <CheckCircle2 size={16} />
+                        </button>
+                        <button onClick={() => rejectTransaction(tx.id)} className="p-1.5 rounded-lg bg-status-error/10 text-status-error hover:bg-status-error/20" title="Reject">
+                          <XCircle size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
