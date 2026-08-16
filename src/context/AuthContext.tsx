@@ -92,13 +92,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let email = identifier.trim()
 
-    // First try to resolve as username, even if it looks like an email
-    const { data: usernameData, error: usernameError } = await supabase.rpc('get_email_by_username', { p_username: email.toLowerCase() })
-    if (!usernameError && usernameData && usernameData.length > 0) {
-      email = usernameData[0].email
-    } else if (!email.includes('@')) {
-      setIsLoading(false)
-      return { success: false, error: usernameError ? mapSupabaseError(usernameError) : 'No account found with that username.' }
+    if (!email.includes('@')) {
+      const { data, error: rpcError } = await supabase.rpc('get_email_by_username', { p_username: email.toLowerCase() })
+      if (rpcError || !data || data.length === 0) {
+        setIsLoading(false)
+        return { success: false, error: rpcError ? mapSupabaseError(rpcError) : 'No account found with that username.' }
+      }
+      email = data[0].email
     }
 
     const { error } = await supabase.auth.signInWithPassword({ email: email.toLowerCase(), password })
