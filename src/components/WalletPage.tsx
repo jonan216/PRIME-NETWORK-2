@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Copy, Check, ArrowUpRight, Wallet as WalletIcon } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { formatDualCurrency } from '../lib/currency'
 import { NavLink } from 'react-router-dom'
 
 export default function WalletPage() {
@@ -27,7 +28,7 @@ export default function WalletPage() {
       <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <p className="text-xs font-medium text-text-secondary">Available Wallet Balance</p>
-          <p className="text-3xl font-display font-bold text-accent mt-1">UGX {balance.toLocaleString()}</p>
+          <p className="text-3xl font-display font-bold text-accent mt-1">{formatDualCurrency(balance)}</p>
         </div>
         <div className="flex gap-3">
           <NavLink to="/dashboard/deposit" className="px-4 py-2.5 bg-accent hover:bg-accent-hover text-white rounded-xl text-sm font-medium transition-colors">

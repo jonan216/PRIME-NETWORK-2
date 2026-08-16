@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom'
 import { DollarSign, TrendingUp, Wallet, Users, ArrowDownToLine, Plus, Loader2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { supabase, mapSupabaseError } from '../lib/supabaseClient'
+import { formatDualCurrency } from '../lib/currency'
 
 interface Transaction {
   id: string
@@ -56,8 +57,8 @@ export default function DashboardHome() {
   const totalInvested = investments.reduce((sum, inv) => sum + (inv.amount || 0), 0)
 
   const stats = [
-    { label: 'Available Balance', value: `UGX ${availableBalance.toLocaleString()}`, icon: Wallet, color: 'text-accent' },
-    { label: 'Total Invested', value: `UGX ${totalInvested.toLocaleString()}`, icon: TrendingUp, color: 'text-text-primary' },
+    { label: 'Available Balance', value: formatDualCurrency(availableBalance), icon: Wallet, color: 'text-accent' },
+    { label: 'Total Invested', value: formatDualCurrency(totalInvested), icon: TrendingUp, color: 'text-text-primary' },
     { label: 'Active Packages', value: `${investments.filter(i => i.status === 'active').length}`, icon: DollarSign, color: 'text-status-success' },
     { label: 'KYC Status', value: profile?.kyc_verified ? 'Verified' : 'Unverified', icon: Users, color: profile?.kyc_verified ? 'text-status-success' : 'text-status-warning' },
   ]
@@ -95,7 +96,7 @@ export default function DashboardHome() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-text-primary capitalize">{activity.type}</p>
-                    <p className="text-xs text-text-secondary">UGX {activity.amount.toLocaleString()} · Status: {activity.status}</p>
+                    <p className="text-xs text-text-secondary">{formatDualCurrency(activity.amount)} · Status: {activity.status}</p>
                   </div>
                   <span className="text-xs text-text-secondary flex-shrink-0">
                     {new Date(activity.created_at).toLocaleDateString()}
@@ -150,7 +151,7 @@ export default function DashboardHome() {
                       <p className="text-xs text-text-secondary">Daily ROI: {pkg.daily_roi}%</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-medium text-accent">UGX {pkg.amount.toLocaleString()}</p>
+                      <p className="text-sm font-medium text-accent">{formatDualCurrency(pkg.amount)}</p>
                       <span className="text-[10px] uppercase font-semibold text-status-success">{pkg.status}</span>
                     </div>
                   </div>

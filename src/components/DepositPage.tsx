@@ -3,6 +3,7 @@ import { ShieldCheck, Wallet, Building2, CreditCard, ArrowRight, Loader2, CheckC
 import { initiateDeposit, getTransactionStatus } from '../lib/marzApi'
 import { useAuth } from '../context/AuthContext'
 
+
 type PaymentStatus = 'idle' | 'pending' | 'waiting' | 'completed' | 'failed'
 
 export default function DepositPage() {

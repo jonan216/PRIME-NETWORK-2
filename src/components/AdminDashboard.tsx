@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Shield, Users, ArrowLeftRight, TrendingUp, CheckCircle2, XCircle, Search, Settings, BarChart3, Trash2, RefreshCw, Loader2 } from 'lucide-react'
 import { supabase, mapSupabaseError } from '../lib/supabaseClient'
+import { formatDualCurrency } from '../lib/currency'
 
 interface Profile {
   id: string
@@ -229,7 +230,7 @@ export default function AdminDashboard() {
               <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
                 <p className="text-sm text-text-secondary mb-1">Combined Balance</p>
                 <p className="text-3xl font-display font-semibold text-accent">
-                  UGX {totalBalance.toLocaleString()}
+                  {formatDualCurrency(totalBalance)}
                 </p>
               </div>
               <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
@@ -289,7 +290,7 @@ export default function AdminDashboard() {
                         <p className="text-sm font-medium text-text-primary">
                           {tx.profiles?.full_name || tx.profiles?.email || 'Unknown User'}
                         </p>
-                        <p className="text-xs text-text-secondary">{tx.type} · UGX {tx.amount.toLocaleString()}</p>
+                        <p className="text-xs text-text-secondary">{tx.type} · {formatDualCurrency(tx.amount)}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <button onClick={() => approveTransaction(tx.id)} className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20">
@@ -364,7 +365,7 @@ export default function AdminDashboard() {
                             {new Date(u.created_at).toLocaleDateString()}
                           </td>
                           <td className="py-4 pr-4"><StatusBadge status={u.status} /></td>
-                          <td className="py-4 text-sm text-text-primary pr-4">UGX {(u.balance || 0).toLocaleString()}</td>
+                          <td className="py-4 text-sm text-text-primary pr-4">{formatDualCurrency(u.balance || 0)}</td>
                           <td className="py-4">
                             <div className="flex items-center gap-2">
                               {u.status === 'active' && u.role !== 'admin' && (
@@ -452,7 +453,7 @@ export default function AdminDashboard() {
                               'bg-accent/10 text-accent'
                             }`}>{tx.type}</span>
                           </td>
-                          <td className="py-4 text-sm text-text-primary pr-4">UGX {tx.amount.toLocaleString()}</td>
+                          <td className="py-4 text-sm text-text-primary pr-4">{formatDualCurrency(tx.amount)}</td>
                           <td className="py-4 text-sm text-text-secondary pr-4">{tx.provider || '—'}</td>
                           <td className="py-4 text-sm text-text-secondary pr-4 whitespace-nowrap">
                             {new Date(tx.created_at).toLocaleDateString()}
@@ -493,7 +494,7 @@ export default function AdminDashboard() {
                   <div key={tx.id} className="flex items-center justify-between p-4 bg-cream-secondary/50 rounded-xl">
                     <div>
                       <p className="text-sm font-medium text-text-primary">{tx.profiles?.full_name || tx.profiles?.email || '—'}</p>
-                      <p className="text-xs text-text-secondary">UGX {tx.amount.toLocaleString()} · {new Date(tx.created_at).toLocaleDateString()}</p>
+                       <p className="text-xs text-text-secondary">{formatDualCurrency(tx.amount)} · {new Date(tx.created_at).toLocaleDateString()}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button onClick={() => approveTransaction(tx.id)} className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20" title="Approve">
@@ -524,8 +525,8 @@ export default function AdminDashboard() {
                   { label: 'Referral Commission - Level 1 (%)', defaultValue: '5' },
                   { label: 'Referral Commission - Level 2 (%)', defaultValue: '3' },
                   { label: 'Referral Commission - Level 3 (%)', defaultValue: '1' },
-                  { label: 'Minimum Deposit (UGX)', defaultValue: '10000' },
-                  { label: 'Minimum Withdrawal (UGX)', defaultValue: '20000' },
+                  { label: 'Minimum Deposit (UGX)', defaultValue: '5000' },
+                  { label: 'Minimum Withdrawal (UGX)', defaultValue: '10000' },
                 ].map(({ label, defaultValue }) => (
                   <div key={label}>
                     <label className="block text-sm font-medium text-text-primary mb-2">{label}</label>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Users, Copy, Check, TrendingUp } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { formatDualCurrency } from '../lib/currency'
 
 interface TeamMember {
   id: string
@@ -56,7 +57,7 @@ export default function TeamPage() {
             <TrendingUp size={20} className="text-accent" />
             <p className="text-sm text-text-secondary">Total Earnings</p>
           </div>
-          <p className="text-2xl font-display font-bold text-status-success">${totalTeamEarnings.toLocaleString()}</p>
+          <p className="text-2xl font-display font-bold text-status-success">{formatDualCurrency(totalTeamEarnings)}</p>
           <p className="text-xs text-text-secondary mt-1">Lifetime earnings</p>
         </div>
         <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
@@ -159,8 +160,8 @@ export default function TeamPage() {
                       {member.status}
                     </span>
                   </td>
-                  <td className="py-4 text-sm text-text-primary text-right">${member.investments.toLocaleString()}</td>
-                  <td className="py-4 text-sm text-status-success text-right font-medium">+${member.yourEarnings.toLocaleString()}</td>
+                  <td className="py-4 text-sm text-text-primary text-right">{formatDualCurrency(member.investments)}</td>
+                  <td className="py-4 text-sm text-status-success text-right font-medium">{formatDualCurrency(member.yourEarnings)}</td>
                 </tr>
               ))}
             </tbody>

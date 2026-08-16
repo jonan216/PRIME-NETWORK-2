@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, PackageOpen, Loader2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { supabase, mapSupabaseError } from '../lib/supabaseClient'
+import { formatDualCurrency } from '../lib/currency'
 
 interface Package {
   id: string
@@ -154,7 +155,7 @@ export default function PackagesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
           <p className="text-sm text-text-secondary mb-1">Total Invested</p>
-          <p className="text-2xl font-display font-bold text-text-primary">UGX {totalInvested.toLocaleString()}</p>
+          <p className="text-2xl font-display font-bold text-text-primary">{formatDualCurrency(totalInvested)}</p>
         </div>
         <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
           <p className="text-sm text-text-secondary mb-1">Active Packages</p>
@@ -189,7 +190,7 @@ export default function PackagesPage() {
                   <tr key={pkg.id}>
                     <td className="py-4 text-sm font-medium text-text-primary">{pkg.plan_name}</td>
                     <td className="py-4 text-sm text-accent">{pkg.daily_roi}%</td>
-                    <td className="py-4 text-sm text-text-primary">UGX {pkg.amount.toLocaleString()}</td>
+                    <td className="py-4 text-sm text-text-primary">{formatDualCurrency(pkg.amount)}</td>
                     <td className="py-4">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-status-success/10 text-status-success capitalize">
                         {pkg.status}

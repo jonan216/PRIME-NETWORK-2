@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Wallet, TrendingUp, CircleDollarSign, ArrowDownToLine, Send } from 'lucide-react'
+import { formatDualCurrency } from '../lib/currency'
 
 interface Transaction {
   id: string
@@ -32,7 +33,7 @@ export default function WalletView() {
 
         <div className="bg-cream-card rounded-cream-lg border border-cream-border p-8 shadow-cream-lg mb-6">
           <p className="text-text-secondary text-sm mb-2">Available Balance</p>
-          <p className="text-4xl md:text-5xl font-bold text-accent">$0.00</p>
+          <p className="text-4xl md:text-5xl font-bold text-accent">{formatDualCurrency(0)}</p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
@@ -48,7 +49,7 @@ export default function WalletView() {
                 </div>
                 <p className="text-text-secondary text-sm mb-1">{card.label}</p>
                 <p className="text-xl font-bold text-accent">
-                  ${card.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatDualCurrency(card.value)}
                 </p>
               </div>
             )
@@ -76,7 +77,7 @@ export default function WalletView() {
                       <td className="px-6 py-4 text-text-primary text-sm">{tx.date}</td>
                       <td className="px-6 py-4 text-text-primary text-sm">{tx.type}</td>
                       <td className="px-6 py-4 text-text-primary text-sm font-medium">
-                        ${tx.amount.toLocaleString()}
+                        {formatDualCurrency(tx.amount)}
                       </td>
                       <td className="px-6 py-4">
                         <span

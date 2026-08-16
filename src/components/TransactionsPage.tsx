@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Search, Filter, ArrowDownToLine, ArrowUpFromLine, TrendingUp, Users, ArrowLeftRight, DollarSign, Loader2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { supabase, mapSupabaseError } from '../lib/supabaseClient'
+import { formatDualCurrency } from '../lib/currency'
 
 interface Transaction {
   id: string
@@ -145,11 +146,11 @@ export default function TransactionsPage() {
                       </td>
                       <td className="py-4 text-sm text-text-secondary">{tx.provider || '—'}</td>
                       <td className={`py-4 text-sm font-medium text-right ${
-                        tx.type === 'deposit' || tx.type === 'earning' || tx.type === 'referral_reward' 
+                        tx.type === 'deposit' || tx.type === 'earning' || tx.type === 'referral_reward'
                           ? 'text-status-success' : 'text-text-primary'
                       }`}>
                         {tx.type === 'deposit' || tx.type === 'earning' || tx.type === 'referral_reward' ? '+' : '-'}
-                        UGX {tx.amount.toLocaleString()}
+                        {formatDualCurrency(tx.amount)}
                       </td>
                       <td className="py-4 text-right">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ArrowUpRight, Wallet, Building2, History, Loader2, CheckCircle2, Clock, XCircle } from 'lucide-react'
 import { initiateWithdrawal, getTransactionStatus } from '../lib/marzApi'
 import { useAuth } from '../context/AuthContext'
+import { formatDualCurrency } from '../lib/currency'
 
 type PaymentStatus = 'idle' | 'pending' | 'waiting' | 'completed' | 'failed'
 
@@ -109,7 +110,7 @@ export default function WithdrawPage() {
               <>
                 <div className="mb-6">
                   <p className="text-sm text-text-secondary mb-1">Available Balance</p>
-                  <p className="text-4xl font-display font-semibold text-accent">UGX {((profile?.balance ?? 0)).toLocaleString('en-US')}</p>
+                  <p className="text-4xl font-display font-semibold text-accent">{formatDualCurrency(profile?.balance ?? 0)}</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-5">

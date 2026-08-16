@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { TrendingUp, Loader2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { supabase, mapSupabaseError } from '../lib/supabaseClient'
+import { formatDualCurrency } from '../lib/currency'
 
 interface Plan {
   id: string
@@ -126,11 +127,11 @@ export default function InvestmentPage() {
                 <div className="space-y-2 mb-6">
                   <div className="flex justify-between text-sm">
                     <span className="text-text-secondary">Min Investment</span>
-                    <span className="text-text-primary font-medium">UGX {plan.minInvestment.toLocaleString()}</span>
+                    <span className="text-text-primary font-medium">{formatDualCurrency(plan.minInvestment)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-text-secondary">Max Investment</span>
-                    <span className="text-text-primary font-medium">UGX {plan.maxInvestment.toLocaleString()}</span>
+                    <span className="text-text-primary font-medium">{formatDualCurrency(plan.maxInvestment)}</span>
                   </div>
                 </div>
                 <button
@@ -180,7 +181,7 @@ export default function InvestmentPage() {
                     <div className="flex justify-between items-end">
                       <div>
                         <p className="text-text-secondary text-xs mb-1">Invested</p>
-                        <p className="text-text-primary font-semibold">UGX {investment.amount.toLocaleString()}</p>
+                         <p className="text-text-primary font-semibold">{formatDualCurrency(investment.amount)}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-text-secondary text-xs mb-1">Daily ROI</p>
@@ -201,7 +202,7 @@ export default function InvestmentPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-cream-card rounded-cream-lg border border-cream-border p-5 shadow-cream">
               <p className="text-text-secondary text-sm mb-1">Total Invested</p>
-              <p className="text-2xl font-bold text-text-primary">UGX {totalInvested.toLocaleString()}</p>
+               <p className="text-2xl font-bold text-text-primary">{formatDualCurrency(totalInvested)}</p>
             </div>
             <div className="bg-cream-card rounded-cream-lg border border-cream-border p-5 shadow-cream">
               <p className="text-text-secondary text-sm mb-1">Active Plans</p>
