@@ -209,41 +209,36 @@ marzRouter.post(['/webhook', '/'], async (req, res) => {
         .single()
 
       if (existingTx) {
-        const newStatus = isSuccess ? 'completed' : 'rejected'
-        if (existingTx.status !== newStatus) {
-          await supabaseAdmin
-            .from('transactions')
-            .update({ status: newStatus })
-            .eq('id', existingTx.id)
+        if (existingTx.type === 'deposit') {
+          const newStatus = isSuccess ? 'completed' : 'rejected'
+          if (existingTx.status !== newStatus) {
+            await supabaseAdmin
+              .from('transactions')
+              .update({ status: newStatus })
+              .eq('id', existingTx.id)
 
-          if (isSuccess && existingTx.type === 'deposit' && existingTx.user_id) {
-            const { data: profile } = await supabaseAdmin
-              .from('profiles')
-              .select('balance')
-              .eq('id', existingTx.user_id)
-              .single()
-
-            if (profile) {
-              await supabaseAdmin
+            if (isSuccess && existingTx.user_id) {
+              const { data: profile } = await supabaseAdmin
                 .from('profiles')
-                .update({ balance: (profile.balance || 0) + (existingTx.amount || 0) })
+                .select('balance')
                 .eq('id', existingTx.user_id)
+                .single()
+
+              if (profile) {
+                await supabaseAdmin
+                  .from('profiles')
+                  .update({ balance: (profile.balance || 0) + (existingTx.amount || 0) })
+                  .eq('id', existingTx.user_id)
+              }
             }
           }
-
-          if (isSuccess && existingTx.type === 'withdrawal' && existingTx.user_id) {
-            const { data: profile } = await supabaseAdmin
-              .from('profiles')
-              .select('balance')
-              .eq('id', existingTx.user_id)
-              .single()
-
-            if (profile) {
-              await supabaseAdmin
-                .from('profiles')
-                .update({ balance: Math.max(0, (profile.balance || 0) - (existingTx.amount || 0)) })
-                .eq('id', existingTx.user_id)
-            }
+        } else if (existingTx.type === 'withdrawal') {
+          const newStatus = isSuccess ? 'completed' : 'rejected'
+          if (existingTx.status !== newStatus) {
+            await supabaseAdmin
+              .from('transactions')
+              .update({ status: newStatus })
+              .eq('id', existingTx.id)
           }
         }
       } else if (isSuccess && userId) {
@@ -268,21 +263,6 @@ marzRouter.post(['/webhook', '/'], async (req, res) => {
 
           if (txType === 'deposit') {
             await supabaseAdmin.rpc('increment_balance', { p_user_id: userId, p_amount: amount })
-          }
-
-          if (txType === 'withdrawal') {
-            const { data: profile } = await supabaseAdmin
-              .from('profiles')
-              .select('balance')
-              .eq('id', userId)
-              .single()
-
-            if (profile) {
-              await supabaseAdmin
-                .from('profiles')
-                .update({ balance: Math.max(0, (profile.balance || 0) - amount) })
-                .eq('id', userId)
-            }
           }
         }
       }

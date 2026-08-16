@@ -90,7 +90,33 @@ export default function AdminDashboard() {
     setUsers(prev => prev.filter(u => u.id !== userId))
   }
 
-  const approveTransaction = async (txId: string) => {
+  const approveTransaction = async (txId: string, type: string) => {
+    if (type === 'withdrawal') {
+      const { data: tx } = await supabase
+        .from('transactions')
+        .select('amount, user_id')
+        .eq('id', txId)
+        .single()
+
+      if (tx) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('balance')
+          .eq('id', tx.user_id)
+          .single()
+
+        if (profile && (profile.balance || 0) >= (tx.amount || 0)) {
+          await supabase
+            .from('profiles')
+            .update({ balance: (profile.balance || 0) - (tx.amount || 0) })
+            .eq('id', tx.user_id)
+        } else {
+          alert('Insufficient balance for this withdrawal.')
+          return
+        }
+      }
+    }
+
     const { error } = await supabase.from('transactions').update({ status: 'approved' }).eq('id', txId)
     if (error) {
       console.error('Error approving transaction:', mapSupabaseError(error))
@@ -292,14 +318,14 @@ export default function AdminDashboard() {
                         </p>
                         <p className="text-xs text-text-secondary">{tx.type} · {formatDualCurrency(tx.amount)}</p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => approveTransaction(tx.id)} className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20">
-                          <CheckCircle2 size={16} />
-                        </button>
-                        <button onClick={() => rejectTransaction(tx.id)} className="p-1.5 rounded-lg bg-status-error/10 text-status-error hover:bg-status-error/20">
-                          <XCircle size={16} />
-                        </button>
-                      </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => approveTransaction(tx.id, tx.type)} className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20">
+                            <CheckCircle2 size={16} />
+                          </button>
+                          <button onClick={() => rejectTransaction(tx.id)} className="p-1.5 rounded-lg bg-status-error/10 text-status-error hover:bg-status-error/20">
+                            <XCircle size={16} />
+                          </button>
+                        </div>
                     </div>
                   ))}
                   {pendingTransactions.length === 0 && (
@@ -460,9 +486,9 @@ export default function AdminDashboard() {
                           </td>
                           <td className="py-4 pr-4"><StatusBadge status={tx.status} /></td>
                           <td className="py-4">
-                            {tx.status === 'pending' && (
+                            {(tx.status === 'pending' || (tx.status === 'completed' && tx.type === 'withdrawal')) && (
                               <div className="flex items-center gap-2">
-                                <button onClick={() => approveTransaction(tx.id)} className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20" title="Approve">
+                                <button onClick={() => approveTransaction(tx.id, tx.type)} className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20" title="Approve">
                                   <CheckCircle2 size={16} />
                                 </button>
                                 <button onClick={() => rejectTransaction(tx.id)} className="p-1.5 rounded-lg bg-status-error/10 text-status-error hover:bg-status-error/20" title="Reject">
@@ -497,7 +523,7 @@ export default function AdminDashboard() {
                        <p className="text-xs text-text-secondary">{formatDualCurrency(tx.amount)} · {new Date(tx.created_at).toLocaleDateString()}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button onClick={() => approveTransaction(tx.id)} className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20" title="Approve">
+                      <button onClick={() => approveTransaction(tx.id, tx.type)} className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20" title="Approve">
                         <CheckCircle2 size={16} />
                       </button>
                       <button onClick={() => rejectTransaction(tx.id)} className="p-1.5 rounded-lg bg-status-error/10 text-status-error hover:bg-status-error/20" title="Reject">
