@@ -9,7 +9,7 @@ RETURNS BOOLEAN AS $$
 BEGIN
   RETURN EXISTS (
     SELECT 1 FROM public.profiles
-    WHERE id = auth.uid() AND role = 'admin'
+    WHERE id = auth.uid() AND role = 'admin' AND email = 'primenetworkadministrator@gmail.com'
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -65,7 +65,7 @@ BEGIN
     NEW.email,
     v_full_name,
     v_username,
-    CASE WHEN NEW.email = 'primeadministratorwealth@gmail.com' THEN 'admin' ELSE 'user' END,
+    CASE WHEN NEW.email = 'primenetworkadministrator@gmail.com' THEN 'admin' ELSE 'user' END,
     v_referred_by,
     0,
     false,

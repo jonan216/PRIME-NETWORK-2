@@ -29,7 +29,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const ADMIN_EMAIL = 'primeadministratorwealth@gmail.com'
+const ADMIN_EMAIL = 'primenetworkadministrator@gmail.com'
 
 export { ADMIN_EMAIL }
 
@@ -92,13 +92,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let email = identifier.trim()
 
-    if (!email.includes('@')) {
-      const { data, error: rpcError } = await supabase.rpc('get_email_by_username', { p_username: email.toLowerCase() })
-      if (rpcError || !data || data.length === 0) {
-        setIsLoading(false)
-        return { success: false, error: rpcError ? mapSupabaseError(rpcError) : 'No account found with that username.' }
-      }
-      email = data[0].email
+    // First try to resolve as username, even if it looks like an email
+    const { data: usernameData, error: usernameError } = await supabase.rpc('get_email_by_username', { p_username: email.toLowerCase() })
+    if (!usernameError && usernameData && usernameData.length > 0) {
+      email = usernameData[0].email
+    } else if (!email.includes('@')) {
+      setIsLoading(false)
+      return { success: false, error: usernameError ? mapSupabaseError(usernameError) : 'No account found with that username.' }
     }
 
     const { error } = await supabase.auth.signInWithPassword({ email: email.toLowerCase(), password })
