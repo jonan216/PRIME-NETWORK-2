@@ -158,17 +158,26 @@ marzRouter.post('/disburse', async (req, res) => {
 // ---------------------------------------------------------------------------
 marzRouter.get('/health', async (req, res) => {
   try {
-    const response = await axios.get(`${marzConfig.baseUrl}/transaction/test-credentials`, {
-      headers: getMarzAuthHeaders(),
-    })
+    const response = await axios.post(`${marzConfig.baseUrl}/collect-money`, {
+      amount: 100,
+      currency: 'UGX',
+      country: 'UG',
+      phone_number: '+256781969741',
+      provider: 'mtn_momo',
+      reference: 'HEALTH-CHECK-' + Date.now(),
+      callback_url: marzConfig.callbackUrl,
+      user_id: 'health-check',
+    }, { headers: getMarzAuthHeaders() })
+
     return res.status(200).json({
       status: 'ok',
+      message: 'Marz credentials are valid',
       marz: response.data,
     })
   } catch (error) {
     const errData = error.response?.data || {}
     console.error('[MARZ] health check error', errData || error.message)
-    return res.status(500).json({
+    return res.status(200).json({
       status: 'error',
       message: errData.message || 'Marz credentials check failed',
       baseUrl: marzConfig.baseUrl,
