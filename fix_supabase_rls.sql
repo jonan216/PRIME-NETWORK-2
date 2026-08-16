@@ -134,3 +134,5 @@ CREATE POLICY "Investments update policy" ON public.investments
 GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.get_email_by_username(TEXT) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.username_exists(TEXT) TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.recalculate_balance(UUID) TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.recalculate_all_balances() TO authenticated, anon;

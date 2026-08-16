@@ -115,3 +115,44 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION public.process_referral_bonus(UUID, NUMERIC) TO authenticated, anon;
+
+-- 8. Recalculate a single user's balance from approved/completed transactions
+CREATE OR REPLACE FUNCTION public.recalculate_balance(p_user_id UUID)
+RETURNS NUMERIC AS $$
+DECLARE
+  v_new_balance NUMERIC := 0;
+BEGIN
+  SELECT coalesce(sum(
+    CASE
+      WHEN type IN ('deposit', 'earning', 'referral_reward') AND status IN ('completed', 'approved') THEN amount
+      WHEN type = 'withdrawal' AND status = 'approved' THEN -amount
+      ELSE 0
+    END
+  ), 0) INTO v_new_balance
+  FROM public.transactions
+  WHERE user_id = p_user_id;
+
+  UPDATE public.profiles
+  SET balance = v_new_balance
+  WHERE id = p_user_id;
+
+  RETURN v_new_balance;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.recalculate_balance(UUID) TO authenticated, anon;
+
+-- 9. Recalculate all user balances
+CREATE OR REPLACE FUNCTION public.recalculate_all_balances()
+RETURNS TABLE(user_id UUID, old_balance NUMERIC, new_balance NUMERIC) AS $$
+DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN SELECT id, balance FROM public.profiles LOOP
+    RETURN QUERY
+    SELECT r.id, r.balance, public.recalculate_balance(r.id);
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.recalculate_all_balances() TO authenticated, anon;

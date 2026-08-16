@@ -67,9 +67,7 @@ export default function AdminDashboard() {
 
   // Load on mount and on tab change
   useEffect(() => { loadUsers() }, [loadUsers])
-  useEffect(() => {
-    if (activeTab === 'transactions' || activeTab === 'profits') loadTransactions()
-  }, [activeTab, loadTransactions])
+  useEffect(() => { loadTransactions() }, [loadTransactions])
 
   // ─── Actions ──────────────────────────────────────────────────
   const updateUserStatus = async (userId: string, status: string) => {
@@ -132,6 +130,31 @@ export default function AdminDashboard() {
       return
     }
     setTransactions(prev => prev.map(t => t.id === txId ? { ...t, status: 'rejected' } : t))
+  }
+
+  const reconcileUserBalance = async (userId: string) => {
+    const { data, error } = await supabase.rpc('recalculate_balance', { p_user_id: userId })
+    if (error) {
+      console.error('Error reconciling balance:', mapSupabaseError(error))
+      alert('Failed to reconcile balance: ' + mapSupabaseError(error))
+      return
+    }
+    alert(`Balance reconciled successfully. New balance: ${formatDualCurrency(data || 0)}`)
+    loadUsers()
+    loadTransactions()
+  }
+
+  const reconcileAllBalances = async () => {
+    if (!window.confirm('This will recalculate ALL user balances from their transaction history. Continue?')) return
+    const { error } = await supabase.rpc('recalculate_all_balances')
+    if (error) {
+      console.error('Error reconciling all balances:', mapSupabaseError(error))
+      alert('Failed to reconcile balances: ' + mapSupabaseError(error))
+      return
+    }
+    alert('All balances reconciled successfully.')
+    loadUsers()
+    loadTransactions()
   }
 
   // ─── Derived stats ────────────────────────────────────────────
@@ -267,6 +290,19 @@ export default function AdminDashboard() {
                 <p className="text-sm text-text-secondary mb-1">Pending Actions</p>
                 <p className="text-3xl font-display font-semibold text-status-warning">{pendingTx}</p>
                 <p className="text-xs text-text-secondary mt-1">transactions awaiting review</p>
+              </div>
+              <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6 flex flex-col justify-between">
+                <div>
+                  <p className="text-sm text-text-secondary mb-1">Balance Reconciliation</p>
+                  <p className="text-xs text-text-secondary mt-1">Recalculate all user balances from transaction history</p>
+                </div>
+                <button
+                  onClick={reconcileAllBalances}
+                  className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-xl text-sm font-medium transition-colors"
+                >
+                  <RefreshCw size={16} />
+                  Reconcile All Balances
+                </button>
               </div>
             </div>
 
@@ -410,6 +446,15 @@ export default function AdminDashboard() {
                                   title="Reactivate"
                                 >
                                   <CheckCircle2 size={16} />
+                                </button>
+                              )}
+                              {u.role !== 'admin' && (
+                                <button
+                                  onClick={() => reconcileUserBalance(u.id)}
+                                  className="p-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+                                  title="Reconcile Balance"
+                                >
+                                  <RefreshCw size={16} />
                                 </button>
                               )}
                               {u.role !== 'admin' && (
