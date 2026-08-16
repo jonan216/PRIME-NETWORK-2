@@ -12,17 +12,18 @@
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 DROP TRIGGER IF EXISTS set_referral_code ON public.profiles;
 
--- Drop functions
-DROP FUNCTION IF EXISTS public.is_admin();
-DROP FUNCTION IF EXISTS public.get_email_by_username(TEXT);
-DROP FUNCTION IF EXISTS public.username_exists(TEXT);
-DROP FUNCTION IF EXISTS public.handle_new_user_registration();
-DROP FUNCTION IF EXISTS public.generate_referral_code();
-DROP FUNCTION IF EXISTS public.increment_balance(UUID, NUMERIC);
-DROP FUNCTION IF EXISTS public.process_referral_bonus(UUID, NUMERIC);
-DROP FUNCTION IF EXISTS public.recalculate_balance(UUID);
-DROP FUNCTION IF EXISTS public.recalculate_all_balances();
-DROP FUNCTION IF EXISTS public.generate_referral_code_for_backfill(UUID);
+-- Drop functions with CASCADE to remove dependent policies automatically
+DROP FUNCTION IF EXISTS public.is_admin() CASCADE;
+DROP FUNCTION IF EXISTS public.get_email_by_username(TEXT) CASCADE;
+DROP FUNCTION IF EXISTS public.username_exists(TEXT) CASCADE;
+DROP FUNCTION IF EXISTS public.handle_new_user_registration() CASCADE;
+DROP FUNCTION IF EXISTS public.generate_referral_code() CASCADE;
+DROP FUNCTION IF EXISTS public.increment_balance(UUID, NUMERIC) CASCADE;
+DROP FUNCTION IF EXISTS public.process_referral_bonus(UUID, NUMERIC) CASCADE;
+DROP FUNCTION IF EXISTS public.recalculate_balance(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.recalculate_all_balances() CASCADE;
+DROP FUNCTION IF EXISTS public.generate_referral_code_for_backfill(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.generate_referral_code_trigger() CASCADE;
 
 -- Drop policies
 DO $$
