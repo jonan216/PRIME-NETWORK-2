@@ -113,6 +113,16 @@ export default function AdminDashboard() {
           return
         }
       }
+    } else if (type === 'deposit') {
+      const { data: tx } = await supabase
+        .from('transactions')
+        .select('amount, user_id')
+        .eq('id', txId)
+        .single()
+
+      if (tx && tx.user_id) {
+        await supabase.rpc('increment_balance', { p_user_id: tx.user_id, p_amount: tx.amount || 0 })
+      }
     }
 
     const { error } = await supabase.from('transactions').update({ status: 'approved' }).eq('id', txId)
@@ -160,7 +170,7 @@ export default function AdminDashboard() {
   // ─── Derived stats ────────────────────────────────────────────
   const nonAdminUsers = users.filter(u => u.role !== 'admin')
   const activeUsers = nonAdminUsers.filter(u => u.status === 'active').length
-  const pendingTx = transactions.filter(t => t.status === 'pending').length
+  const pendingTx = transactions.filter(t => t.status === 'pending' || t.status === 'pending_approval').length
   const totalBalance = nonAdminUsers.reduce((s, u) => s + (u.balance || 0), 0)
 
   const filteredUsers = users.filter(u =>
@@ -169,13 +179,13 @@ export default function AdminDashboard() {
     (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const pendingTransactions = transactions.filter(t => t.status === 'pending')
+  const pendingTransactions = transactions.filter(t => t.status === 'pending' || t.status === 'pending_approval')
 
   // ─── Shared status badge ──────────────────────────────────────
   const StatusBadge = ({ status }: { status: string }) => (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-      status === 'active' || status === 'approved' ? 'bg-status-success/10 text-status-success' :
-      status === 'pending' ? 'bg-status-warning/10 text-status-warning' :
+      status === 'active' || status === 'approved' || status === 'completed' ? 'bg-status-success/10 text-status-success' :
+      status === 'pending' || status === 'pending_approval' ? 'bg-status-warning/10 text-status-warning' :
       'bg-status-error/10 text-status-error'
     }`}>
       {status}
@@ -531,7 +541,7 @@ export default function AdminDashboard() {
                           </td>
                           <td className="py-4 pr-4"><StatusBadge status={tx.status} /></td>
                           <td className="py-4">
-                            {(tx.status === 'pending' || (tx.status === 'completed' && tx.type === 'withdrawal')) && (
+                            {(tx.status === 'pending' || tx.status === 'pending_approval' || (tx.status === 'completed' && tx.type === 'withdrawal')) && (
                               <div className="flex items-center gap-2">
                                 <button onClick={() => approveTransaction(tx.id, tx.type)} className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20" title="Approve">
                                   <CheckCircle2 size={16} />

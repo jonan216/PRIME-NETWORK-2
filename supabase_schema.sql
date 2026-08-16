@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS public.transactions (
   user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   type TEXT NOT NULL CHECK (type IN ('deposit', 'withdrawal', 'investment', 'earning', 'referral_reward')),
   amount NUMERIC NOT NULL,
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'completed')),
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'pending_approval', 'approved', 'rejected', 'completed')),
   provider TEXT DEFAULT NULL,
   reference TEXT DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT now()

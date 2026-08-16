@@ -210,27 +210,12 @@ marzRouter.post(['/webhook', '/'], async (req, res) => {
 
       if (existingTx) {
         if (existingTx.type === 'deposit') {
-          const newStatus = isSuccess ? 'completed' : 'rejected'
+          const newStatus = isSuccess ? 'pending_approval' : 'rejected'
           if (existingTx.status !== newStatus) {
             await supabaseAdmin
               .from('transactions')
               .update({ status: newStatus })
               .eq('id', existingTx.id)
-
-            if (isSuccess && existingTx.user_id) {
-              const { data: profile } = await supabaseAdmin
-                .from('profiles')
-                .select('balance')
-                .eq('id', existingTx.user_id)
-                .single()
-
-              if (profile) {
-                await supabaseAdmin
-                  .from('profiles')
-                  .update({ balance: (profile.balance || 0) + (existingTx.amount || 0) })
-                  .eq('id', existingTx.user_id)
-              }
-            }
           }
         } else if (existingTx.type === 'withdrawal') {
           const newStatus = isSuccess ? 'completed' : 'rejected'
@@ -256,13 +241,13 @@ marzRouter.post(['/webhook', '/'], async (req, res) => {
             user_id: userId,
             type: txType,
             amount,
-            status: 'completed',
+            status: txType === 'deposit' ? 'pending_approval' : 'completed',
             provider: event.provider || event.channel || null,
             reference,
           })
 
           if (txType === 'deposit') {
-            await supabaseAdmin.rpc('increment_balance', { p_user_id: userId, p_amount: amount })
+            // Do NOT increment balance here; admin must approve first
           }
         }
       }
