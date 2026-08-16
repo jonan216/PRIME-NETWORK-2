@@ -190,6 +190,51 @@ export default function AdminDashboard() {
     loadTransactions()
   }
 
+  const syncPendingDeposits = async () => {
+    if (!window.confirm('This will check all pending deposits against Marz Innovations and update their status. Continue?')) return
+    setTxLoading(true)
+    try {
+      const { data: pendingDeposits } = await supabase
+        .from('transactions')
+        .select('id, reference, amount, user_id')
+        .eq('type', 'deposit')
+        .in('status', ['pending', 'pending_approval'])
+
+      if (!pendingDeposits || pendingDeposits.length === 0) {
+        alert('No pending deposits to sync.')
+        setTxLoading(false)
+        return
+      }
+
+      let synced = 0
+      for (const tx of pendingDeposits) {
+        try {
+          const res = await fetch(`/api/marz/transaction/${encodeURIComponent(tx.reference || '')}`)
+          if (res.ok) {
+            const data = await res.json()
+            const status = String(data.status || data.data?.status || '').toLowerCase()
+            if (['completed', 'success', 'paid', 'credited', 'successful'].includes(status)) {
+              await supabase.from('transactions').update({ status: 'pending_approval' }).eq('id', tx.id)
+              synced++
+            } else if (['failed', 'rejected', 'cancelled', 'expired'].includes(status)) {
+              await supabase.from('transactions').update({ status: 'rejected' }).eq('id', tx.id)
+              synced++
+            }
+          }
+        } catch (err) {
+          console.error('Error syncing deposit', tx.reference, err)
+        }
+      }
+
+      alert(`Sync complete. ${synced} deposits updated.`)
+      loadTransactions()
+    } catch (err) {
+      console.error('Error syncing deposits:', err)
+      alert('Failed to sync deposits.')
+    }
+    setTxLoading(false)
+  }
+
   // ─── Derived stats ────────────────────────────────────────────
   const nonAdminUsers = users.filter(u => u.role !== 'admin')
   const activeUsers = nonAdminUsers.filter(u => u.status === 'active').length
@@ -611,9 +656,14 @@ export default function AdminDashboard() {
             <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-text-primary">Deposit Approvals</h2>
-                <button onClick={loadTransactions} className="p-2 rounded-xl bg-accent/10 hover:bg-accent/20 text-accent transition-colors">
-                  {txLoading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button onClick={syncPendingDeposits} className="p-2 rounded-xl bg-accent/10 hover:bg-accent/20 text-accent transition-colors" title="Sync pending deposits with Marz">
+                    {txLoading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
+                  </button>
+                  <button onClick={loadTransactions} className="p-2 rounded-xl bg-accent/10 hover:bg-accent/20 text-accent transition-colors" title="Refresh">
+                    <RefreshCw size={18} />
+                  </button>
+                </div>
               </div>
               {txLoading ? (
                 <div className="flex justify-center py-10"><Loader2 className="animate-spin text-accent" size={28} /></div>
