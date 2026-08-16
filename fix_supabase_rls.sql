@@ -41,10 +41,9 @@ DECLARE
   v_full_name TEXT;
   v_referred_by TEXT;
 BEGIN
-  v_username := lower(NEW.raw_user_meta_data->>'username')
-    WHERE NEW.raw_user_meta_data->>'username' IS NOT NULL;
+  v_username := lower(NEW.raw_user_meta_data->>'username');
 
-  IF v_username IS NULL THEN
+  IF v_username IS NULL OR v_username = '' THEN
     v_username := 'user_' || substr(replace(NEW.id::text, '-', ''), -6);
   END IF;
 
