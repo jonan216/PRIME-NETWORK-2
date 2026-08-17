@@ -16,7 +16,6 @@ interface Package {
 export default function PackagesPage() {
   const { profile } = useAuth()
   const [showAddForm, setShowAddForm] = useState(false)
-  const [selectedPlan, setSelectedPlan] = useState('')
   const [amount, setAmount] = useState('')
   const [packages, setPackages] = useState<Package[]>([])
   const [loading, setLoading] = useState(true)
@@ -55,13 +54,12 @@ export default function PackagesPage() {
     setSubmitting(true)
 
     const numAmount = parseFloat(amount)
-    let dailyRoi = 5
-    if (selectedPlan === 'Growth Plan') dailyRoi = 8
-    if (selectedPlan === 'Premium Plan') dailyRoi = 12
+    const dailyRoi = 1.5
+    const planName = 'Prime Daily Earning'
 
     const { data, error } = await supabase.from('investments').insert({
       user_id: profile.id,
-      plan_name: selectedPlan,
+      plan_name: planName,
       amount: numAmount,
       daily_roi: dailyRoi,
       status: 'active'
@@ -81,13 +79,12 @@ export default function PackagesPage() {
           const { error: rpcError } = await supabase.rpc('process_referral_bonus', { p_investor_id: profile.id, p_amount: numAmount })
           if (rpcError) console.error('Referral bonus error:', mapSupabaseError(rpcError))
         } catch (err) {
-          console.error('Referral bonus error:', mapSupabaseError(err as any))
+          console.error('Referral bonus error:', err as any)
         }
       })()
     }
 
     setShowAddForm(false)
-    setSelectedPlan('')
     setAmount('')
   }
 
@@ -112,20 +109,6 @@ export default function PackagesPage() {
           <h2 className="text-lg font-semibold text-text-primary mb-4">Add New Package</h2>
           {error && <p className="text-status-error text-sm mb-4">{error}</p>}
           <form onSubmit={handleAddPackage} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">Select Plan</label>
-              <select
-                value={selectedPlan}
-                onChange={(e) => setSelectedPlan(e.target.value)}
-                className="w-full px-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/20"
-                required
-              >
-                <option value="">Choose a plan</option>
-                <option value="Starter Plan">Starter Plan — 5% Daily</option>
-                <option value="Growth Plan">Growth Plan — 8% Daily</option>
-                <option value="Premium Plan">Premium Plan — 12% Daily</option>
-              </select>
-            </div>
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">Investment Amount (UGX)</label>
               <input

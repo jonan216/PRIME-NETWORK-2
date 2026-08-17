@@ -24,28 +24,12 @@ interface ActiveInvestment {
 
 const plans: Plan[] = [
   {
-    id: 'starter',
-    name: 'Starter Plan',
-    roi: 5,
+    id: 'prime-daily',
+    name: 'Prime Daily Earning',
+    roi: 1.5,
     minInvestment: 5000,
-    maxInvestment: 100000,
-    description: 'Perfect for beginners. Minimum UGX 5,000 to get started.'
-  },
-  {
-    id: 'growth',
-    name: 'Growth Plan',
-    roi: 8,
-    minInvestment: 101000,
-    maxInvestment: 1000000,
-    description: 'Accelerated daily returns for growing investors.'
-  },
-  {
-    id: 'premium',
-    name: 'Premium Plan',
-    roi: 12,
-    minInvestment: 1001000,
     maxInvestment: 10000000,
-    description: 'Maximum returns with exclusive priority support.'
+    description: 'Earn 1.5% daily returns on your investment.'
   }
 ]
 
@@ -206,7 +190,7 @@ export default function InvestmentPage() {
             </div>
             <div className="bg-cream-card rounded-cream-lg border border-cream-border p-5 shadow-cream">
               <p className="text-text-secondary text-sm mb-1">Active Plans</p>
-              <p className="text-2xl font-bold text-text-primary">{activePlansCount}</p>
+               <p className="text-2xl font-bold text-text-primary">{activePlansCount}</p>
             </div>
           </div>
         </div>

@@ -181,6 +181,23 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Process registration bonus (UGX 2,000 for referrer)
+CREATE OR REPLACE FUNCTION public.process_registration_bonus(p_user_id UUID)
+RETURNS VOID AS $$
+DECLARE
+  v_referrer_id UUID;
+  v_bonus_amount NUMERIC := 200;
+BEGIN
+  SELECT referred_by INTO v_referrer_id FROM public.profiles WHERE id = p_user_id;
+
+  IF v_referrer_id IS NOT NULL THEN
+    PERFORM public.increment_balance(v_referrer_id, v_bonus_amount);
+    INSERT INTO public.transactions (user_id, type, amount, status, provider, reference)
+    VALUES (v_referrer_id, 'referral_reward', v_bonus_amount, 'completed', NULL, 'REF-REG-' || gen_random_uuid());
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Recalculate single user balance from transactions
 CREATE OR REPLACE FUNCTION public.recalculate_balance(p_user_id UUID)
 RETURNS NUMERIC AS $$
@@ -258,6 +275,10 @@ BEGIN
     false,
     'active'
   );
+
+  IF v_referred_by IS NOT NULL THEN
+    PERFORM public.process_registration_bonus(NEW.id);
+  END IF;
 
   RETURN NEW;
 END;
@@ -337,6 +358,7 @@ GRANT EXECUTE ON FUNCTION public.username_exists(TEXT) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.generate_referral_code(UUID) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.increment_balance(UUID, NUMERIC) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.process_referral_bonus(UUID, NUMERIC) TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.process_registration_bonus(UUID) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.recalculate_balance(UUID) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.recalculate_all_balances() TO authenticated, anon;
 
