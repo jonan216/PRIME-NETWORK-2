@@ -89,6 +89,7 @@ export default function AdminDashboard() {
         if (newTx.status === 'pending' || newTx.status === 'pending_approval') {
           setNotification(`New deposit of ${formatDualCurrency(newTx.amount)} from a user needs approval`)
           setTransactions(prev => [newTx, ...prev])
+          setActiveTab('deposit-approvals')
           setTimeout(() => setNotification(null), 5000)
         }
       })

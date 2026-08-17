@@ -34,8 +34,18 @@ export default function DepositPage() {
     setError('')
     setStatus('pending')
 
+    if (!user?.id) {
+      setError('You must be logged in to make a deposit')
+      return
+    }
+
     try {
       const ugxValue = parseFloat(amount)
+
+      if (isNaN(ugxValue) || ugxValue < 5000) {
+        setError('Minimum deposit amount is UGX 5,000')
+        return
+      }
 
       // Auto-format phone to E.164 (+256XXXXXXXXX) before sending
       let formattedPhone = phone.replace(/\D/g, '')
@@ -55,7 +65,7 @@ export default function DepositPage() {
         phone: formattedPhone,
         provider,
         reference: `DEP-${Date.now()}`,
-        user_id: user?.id ?? 'guest',
+        user_id: user.id,
       })
 
       // USSD prompt successfully pushed to user's phone.
