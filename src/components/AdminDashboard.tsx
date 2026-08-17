@@ -215,11 +215,20 @@ export default function AdminDashboard() {
     setTxLoading(false)
   }
 
+  const silentSync = async () => {
+    try {
+      await fetch('/api/marz/sync', { method: 'POST' })
+      loadTransactions()
+    } catch {
+      // silent fail for background sync
+    }
+  }
+
   // Auto-sync pending transactions every 30 seconds when on deposit-approvals tab
   useEffect(() => {
     if (activeTab !== 'deposit-approvals') return
     const interval = setInterval(() => {
-      syncPendingDeposits()
+      silentSync()
     }, 30000)
     return () => clearInterval(interval)
   }, [activeTab])
