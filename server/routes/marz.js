@@ -15,6 +15,41 @@ const normalizeProvider = (p) => {
   return p
 }
 
+async function ensureProfileExists(userId) {
+  if (!isValidUuid(userId)) return null
+  const { data: existing } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .eq('id', userId)
+    .single()
+
+  if (existing) return existing
+
+  const fallbackProfile = {
+    id: userId,
+    email: `user-${userId.slice(0, 8)}@fallback.local`,
+    full_name: '',
+    username: `user_${userId.slice(0, 8)}`,
+    role: 'user',
+    balance: 0,
+    kyc_verified: false,
+    status: 'active',
+    referral_code: `PRIME-${userId.slice(0, 8)}`,
+    referred_by: null,
+  }
+
+  const { error } = await supabaseAdmin
+    .from('profiles')
+    .insert(fallbackProfile)
+
+  if (error) {
+    console.error('[MARZ] failed to create fallback profile:', error.message || error)
+    return null
+  }
+
+  return fallbackProfile
+}
+
 // ---------------------------------------------------------------------------
 // POST /api/marz/collect-money  — Deposit (collect from user's MoMo/Airtel)
 // ---------------------------------------------------------------------------
@@ -47,6 +82,7 @@ marzRouter.post('/collect-money', async (req, res) => {
     const isSandbox = Boolean(response.data?.data?.sandbox_mode || response.data?.sandbox_mode)
 
     if (user_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user_id)) {
+      await ensureProfileExists(user_id)
       supabaseAdmin.from('transactions').insert({
         user_id,
         type: 'deposit',
@@ -113,6 +149,7 @@ marzRouter.post('/disburse', async (req, res) => {
     })
 
     if (user_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user_id)) {
+      await ensureProfileExists(user_id)
       supabaseAdmin.from('transactions').insert({
         user_id,
         type: 'withdrawal',
