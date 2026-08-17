@@ -9,5 +9,11 @@
       "source": "/((?!api).*)",
       "destination": "/index.html"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/earnings/process",
+      "schedule": "0 8 * * 1-5"
+    }
   ]
 }

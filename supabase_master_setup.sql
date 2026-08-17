@@ -77,7 +77,8 @@ CREATE TABLE public.investments (
   amount NUMERIC NOT NULL,
   daily_roi NUMERIC NOT NULL,
   status TEXT DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled')),
-  created_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ DEFAULT now(),
+  last_earning_at TIMESTAMPTZ
 );
 
 -- ==========================================
@@ -260,6 +261,40 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Process daily earnings for active investments (Mon-Fri only)
+CREATE OR REPLACE FUNCTION public.process_daily_earnings()
+RETURNS VOID AS $$
+DECLARE
+  v_investment RECORD;
+  v_earning_amount NUMERIC;
+  v_today INTEGER;
+BEGIN
+  v_today := EXTRACT(ISODOW FROM NOW())
+  IF v_today NOT IN (1, 2, 3, 4, 5) THEN
+    RETURN;
+  END IF;
+
+  FOR v_investment IN
+    SELECT id, user_id, amount, daily_roi, last_earning_at
+    FROM public.investments
+    WHERE status = 'active'
+  LOOP
+    IF v_investment.last_earning_at IS NULL OR v_investment.last_earning_at < NOW() - INTERVAL '24 hours' THEN
+      v_earning_amount := v_investment.amount * (v_investment.daily_roi / 100)
+
+      PERFORM public.increment_balance(v_investment.user_id, v_earning_amount)
+
+      INSERT INTO public.transactions (user_id, type, amount, status, provider, reference)
+      VALUES (v_investment.user_id, 'earning', v_earning_amount, 'completed', NULL, 'EARN-' || gen_random_uuid());
+
+      UPDATE public.investments
+      SET last_earning_at = NOW()
+      WHERE id = v_investment.id;
+    END IF;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Recalculate all balances
 CREATE OR REPLACE FUNCTION public.recalculate_all_balances()
 RETURNS TABLE(user_id UUID, old_balance NUMERIC, new_balance NUMERIC) AS $$
@@ -399,6 +434,7 @@ GRANT EXECUTE ON FUNCTION public.process_referral_bonus(UUID, NUMERIC) TO authen
 GRANT EXECUTE ON FUNCTION public.process_registration_bonus(UUID) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.recalculate_balance(UUID) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.refresh_marz_verified_balance(UUID) TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.process_daily_earnings() TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.recalculate_all_balances() TO authenticated, anon;
 
 -- ==========================================
