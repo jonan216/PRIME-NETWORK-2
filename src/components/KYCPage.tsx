@@ -1,10 +1,31 @@
 import { useState } from 'react'
 import { Shield, FileText, Upload, CheckCircle2, Clock, AlertCircle } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import { supabase, mapSupabaseError } from '../lib/supabaseClient'
 
 type KycStep = 'idle' | 'submitted' | 'under_review' | 'approved' | 'rejected'
 
 export default function KYCPage() {
+  const { user, refreshProfile } = useAuth()
   const [step, setStep] = useState<KycStep>('idle')
+
+  const handleSubmit = async () => {
+    if (!user) return
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ kyc_verified: true })
+      .eq('id', user.id)
+
+    if (error) {
+      console.error('Error submitting KYC:', mapSupabaseError(error))
+      alert('Failed to submit KYC documents. Please try again.')
+      return
+    }
+
+    setStep('submitted')
+    refreshProfile()
+  }
 
   const steps = [
     { id: 'submitted', label: 'Documents Submitted', icon: Upload },
@@ -47,7 +68,7 @@ export default function KYCPage() {
               </div>
 
               <button
-                onClick={() => setStep('submitted')}
+                onClick={handleSubmit}
                 className="w-full px-6 py-3.5 bg-accent hover:bg-accent-hover text-white rounded-xl font-medium transition-colors"
               >
                 Submit Documents

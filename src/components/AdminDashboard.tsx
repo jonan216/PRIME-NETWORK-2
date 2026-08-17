@@ -268,6 +268,7 @@ export default function AdminDashboard() {
     { id: 'users', label: 'Users', Icon: Users },
     { id: 'transactions', label: 'Transactions', Icon: ArrowLeftRight },
     { id: 'deposit-approvals', label: 'Deposit Approvals', Icon: CheckCircle2, badge: pendingDepositsCount },
+    { id: 'kyc', label: 'KYC Approvals', Icon: Shield },
     { id: 'profits', label: 'Profit Approval', Icon: TrendingUp },
     { id: 'settings', label: 'Settings', Icon: Settings },
   ]
@@ -741,6 +742,83 @@ export default function AdminDashboard() {
                       ))}
                       {pendingDeposits.length === 0 && (
                         <tr><td colSpan={7} className="py-10 text-center text-sm text-text-secondary">No pending deposits awaiting approval</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── KYC APPROVALS ── */}
+        {activeTab === 'kyc' && (
+          <div className="space-y-6">
+            <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-text-primary">KYC Verifications</h2>
+                <button onClick={loadUsers} className="p-2 rounded-xl bg-accent/10 hover:bg-accent/20 text-accent transition-colors">
+                  {usersLoading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
+                </button>
+              </div>
+              {usersLoading ? (
+                <div className="flex justify-center py-10"><Loader2 className="animate-spin text-accent" size={28} /></div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-cream-border">
+                        {['User', 'Email', 'Username', 'KYC Status', 'Actions'].map(h => (
+                          <th key={h} className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3 pr-4">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-cream-border">
+                      {users.filter(u => u.role !== 'admin').map(u => (
+                        <tr key={u.id}>
+                          <td className="py-4 text-sm font-medium text-text-primary pr-4 whitespace-nowrap">
+                            {u.full_name || '—'}
+                          </td>
+                          <td className="py-4 text-sm text-text-secondary pr-4">{u.email}</td>
+                          <td className="py-4 text-sm text-text-secondary pr-4">@{u.username}</td>
+                          <td className="py-4 pr-4">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              u.kyc_verified ? 'bg-status-success/10 text-status-success' : 'bg-status-warning/10 text-status-warning'
+                            }`}>
+                              {u.kyc_verified ? 'Verified' : 'Unverified'}
+                            </span>
+                          </td>
+                          <td className="py-4">
+                            <div className="flex items-center gap-2">
+                              {!u.kyc_verified ? (
+                                <button
+                                  onClick={async () => {
+                                    await supabase.from('profiles').update({ kyc_verified: true }).eq('id', u.id)
+                                    setUsers(prev => prev.map(user => user.id === u.id ? { ...user, kyc_verified: true } : user))
+                                  }}
+                                  className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20"
+                                  title="Approve KYC"
+                                >
+                                  <CheckCircle2 size={16} />
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={async () => {
+                                    await supabase.from('profiles').update({ kyc_verified: false }).eq('id', u.id)
+                                    setUsers(prev => prev.map(user => user.id === u.id ? { ...user, kyc_verified: false } : user))
+                                  }}
+                                  className="p-1.5 rounded-lg bg-status-error/10 text-status-error hover:bg-status-error/20"
+                                  title="Reject KYC"
+                                >
+                                  <XCircle size={16} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {users.filter(u => u.role !== 'admin').length === 0 && (
+                        <tr><td colSpan={5} className="py-10 text-center text-sm text-text-secondary">No users registered yet</td></tr>
                       )}
                     </tbody>
                   </table>
