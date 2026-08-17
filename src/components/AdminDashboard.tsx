@@ -13,6 +13,13 @@ interface Profile {
   balance: number
   kyc_verified: boolean
   created_at: string
+  totalDeposits?: number
+  totalWithdrawals?: number
+  totalEarnings?: number
+  totalInvestments?: number
+  activeInvestmentAmount?: number
+  transactionCount?: number
+  investmentCount?: number
 }
 
 interface Transaction {
@@ -27,13 +34,27 @@ interface Transaction {
   profiles?: { full_name: string; email: string }
 }
 
+interface Investment {
+  id: string
+  user_id: string
+  plan_name: string
+  amount: number
+  daily_roi: number
+  status: string
+  created_at: string
+  last_earning_at: string | null
+  profiles?: { full_name: string; email: string }
+}
+
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('deposit-approvals')
+  const [activeTab, setActiveTab] = useState('overview')
   const [users, setUsers] = useState<Profile[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [investments, setInvestments] = useState<Investment[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [usersLoading, setUsersLoading] = useState(false)
   const [txLoading, setTxLoading] = useState(false)
+  const [invLoading, setInvLoading] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [notification, setNotification] = useState<string | null>(null)
 
@@ -66,14 +87,33 @@ export default function AdminDashboard() {
     setTxLoading(false)
   }, [])
 
+  const loadInvestments = useCallback(async () => {
+    setInvLoading(true)
+    const { data, error } = await supabase
+      .from('investments')
+      .select('*, profiles(full_name, email)')
+      .order('created_at', { ascending: false })
+    if (error) {
+      console.error('Error loading investments:', mapSupabaseError(error))
+    } else if (data) {
+      setInvestments(data as Investment[])
+    }
+    setInvLoading(false)
+  }, [])
+
   // Load on mount and on tab change
   useEffect(() => { loadUsers() }, [loadUsers])
   useEffect(() => { loadTransactions() }, [loadTransactions])
   useEffect(() => {
-    if (activeTab === 'deposit-approvals') {
+    if (activeTab === 'deposits' || activeTab === 'transactions') {
       loadTransactions()
     }
   }, [activeTab, loadTransactions])
+  useEffect(() => {
+    if (activeTab === 'investments') {
+      loadInvestments()
+    }
+  }, [activeTab, loadInvestments])
 
   // Real-time notification for new deposits
   useEffect(() => {
@@ -89,7 +129,7 @@ export default function AdminDashboard() {
         if (newTx.status === 'pending' || newTx.status === 'pending_approval') {
           setNotification(`New deposit of ${formatDualCurrency(newTx.amount)} from a user needs approval`)
           setTransactions(prev => [newTx, ...prev])
-          setActiveTab('deposit-approvals')
+           setActiveTab('deposits')
           setTimeout(() => setNotification(null), 5000)
         }
       })
@@ -171,6 +211,44 @@ export default function AdminDashboard() {
     setTransactions(prev => prev.map(t => t.id === txId ? { ...t, status: 'rejected' } : t))
   }
 
+  const cancelInvestment = async (invId: string) => {
+    if (!window.confirm('Cancel this investment and refund the user? This will return the invested amount to the user balance.')) return
+
+    const { data: investment } = await supabase.from('investments').select('*').eq('id', invId).single()
+    if (!investment || investment.status !== 'active') {
+      alert('Investment not found or already cancelled.')
+      return
+    }
+
+    const { error: cancelError } = await supabase.from('investments').update({ status: 'cancelled' }).eq('id', invId)
+    if (cancelError) {
+      console.error('Error cancelling investment:', mapSupabaseError(cancelError))
+      alert('Failed to cancel investment.')
+      return
+    }
+
+    try {
+      await supabase.rpc('increment_balance', { p_user_id: investment.user_id, p_amount: investment.amount })
+    } catch (err) {
+      console.error('Refund error:', err)
+    }
+    try {
+      await supabase.from('transactions').insert({
+        user_id: investment.user_id,
+        type: 'refund',
+        amount: investment.amount,
+        status: 'completed',
+        provider: null,
+        reference: `REFUND-${invId}`,
+      })
+    } catch (err) {
+      console.error('Refund tx error:', err)
+    }
+
+    setInvestments(prev => prev.map(i => i.id === invId ? { ...i, status: 'cancelled' } : i))
+    loadUsers()
+  }
+
   const reconcileUserBalance = async (userId: string) => {
     const { data, error } = await supabase.rpc('recalculate_balance', { p_user_id: userId })
     if (error) {
@@ -224,9 +302,9 @@ export default function AdminDashboard() {
     }
   }
 
-  // Auto-sync pending transactions every 30 seconds when on deposit-approvals tab
+  // Auto-sync pending transactions every 30 seconds when on deposits tab
   useEffect(() => {
-    if (activeTab !== 'deposit-approvals') return
+    if (activeTab !== 'deposits') return
     const interval = setInterval(() => {
       silentSync()
     }, 30000)
@@ -246,8 +324,8 @@ export default function AdminDashboard() {
   )
 
   const pendingTransactions = transactions.filter(t => t.status === 'pending' || t.status === 'pending_approval')
-  const pendingDeposits = transactions.filter(t => t.type === 'deposit' && (t.status === 'pending' || t.status === 'pending_approval'))
-  const pendingDepositsCount = pendingDeposits.length
+  const pendingDeposits = transactions.filter(t => t.type === 'deposit')
+  const pendingDepositsCount = pendingDeposits.filter(t => t.status === 'pending' || t.status === 'pending_approval').length
 
   // ─── Shared status badge ──────────────────────────────────────
   const StatusBadge = ({ status }: { status: string }) => (
@@ -265,7 +343,8 @@ export default function AdminDashboard() {
     { id: 'overview', label: 'Overview', Icon: BarChart3 },
     { id: 'users', label: 'Users', Icon: Users },
     { id: 'transactions', label: 'Transactions', Icon: ArrowLeftRight },
-    { id: 'deposit-approvals', label: 'Deposit Approvals', Icon: CheckCircle2, badge: pendingDepositsCount },
+    { id: 'investments', label: 'Investments', Icon: TrendingUp },
+    { id: 'deposits', label: 'Deposits', Icon: CheckCircle2, badge: pendingDepositsCount },
     { id: 'kyc', label: 'KYC Approvals', Icon: Shield },
     { id: 'profits', label: 'Profit Approval', Icon: TrendingUp },
     { id: 'settings', label: 'Settings', Icon: Settings },
@@ -403,12 +482,12 @@ export default function AdminDashboard() {
             {pendingDeposits.length > 0 && (
               <div className="bg-cream-card rounded-cream-lg border border-status-warning/30 p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
-                    <Bell size={20} className="text-status-warning" />
-                    Pending Deposit Approvals
-                  </h2>
+                     <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+                     <Bell size={20} className="text-status-success" />
+                     Recent Deposits
+                   </h2>
                   <button
-                    onClick={() => setActiveTab('deposit-approvals')}
+                    onClick={() => setActiveTab('deposits')}
                     className="text-sm font-medium text-accent hover:text-accent-hover"
                   >
                     View All
@@ -536,8 +615,8 @@ export default function AdminDashboard() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-cream-border">
-                        {['Name', 'Username', 'Email', 'Role', 'Joined', 'Status', 'Balance', 'Actions'].map(h => (
-                          <th key={h} className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3 pr-4">{h}</th>
+                        {['Name', 'Username', 'Email', 'Role', 'Joined', 'Status', 'Balance', 'Deposits', 'Withdrawals', 'Earnings', 'Investments', 'Actions'].map(h => (
+                          <th key={h} className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3 pr-4 whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -556,7 +635,11 @@ export default function AdminDashboard() {
                             {new Date(u.created_at).toLocaleDateString()}
                           </td>
                           <td className="py-4 pr-4"><StatusBadge status={u.status} /></td>
-                          <td className="py-4 text-sm text-text-primary pr-4">{formatDualCurrency(u.balance || 0)}</td>
+                          <td className="py-4 text-sm text-text-primary pr-4 whitespace-nowrap">{formatDualCurrency(u.balance || 0)}</td>
+                          <td className="py-4 text-sm text-status-success pr-4 whitespace-nowrap">{formatDualCurrency(u.totalDeposits || 0)}</td>
+                          <td className="py-4 text-sm text-status-error pr-4 whitespace-nowrap">{formatDualCurrency(u.totalWithdrawals || 0)}</td>
+                          <td className="py-4 text-sm text-accent pr-4 whitespace-nowrap">{formatDualCurrency(u.totalEarnings || 0)}</td>
+                          <td className="py-4 text-sm text-text-primary pr-4 whitespace-nowrap">{formatDualCurrency(u.activeInvestmentAmount || 0)}</td>
                           <td className="py-4">
                             <div className="flex items-center gap-2">
                               {u.status === 'active' && u.role !== 'admin' && (
@@ -605,7 +688,7 @@ export default function AdminDashboard() {
                       ))}
                       {filteredUsers.length === 0 && (
                         <tr>
-                          <td colSpan={8} className="py-10 text-center text-text-secondary text-sm">
+                          <td colSpan={12} className="py-10 text-center text-text-secondary text-sm">
                             {searchTerm ? 'No users match your search' : 'No users registered yet'}
                           </td>
                         </tr>
@@ -660,7 +743,7 @@ export default function AdminDashboard() {
                           </td>
                           <td className="py-4 pr-4"><StatusBadge status={tx.status} /></td>
                           <td className="py-4">
-                            {(tx.status === 'pending' || tx.status === 'pending_approval' || (tx.status === 'completed' && tx.type === 'withdrawal')) && (
+                            {tx.type === 'withdrawal' && tx.status !== 'cancelled' && tx.status !== 'rejected' && (
                               <div className="flex items-center gap-2">
                                 <button onClick={() => approveTransaction(tx.id, tx.type)} className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20" title="Approve">
                                   <CheckCircle2 size={16} />
@@ -684,12 +767,12 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── DEPOSIT APPROVALS ── */}
-        {activeTab === 'deposit-approvals' && (
+        {/* ── DEPOSITS ── */}
+        {activeTab === 'deposits' && (
           <div className="space-y-6">
             <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-text-primary">Deposit Approvals</h2>
+                <h2 className="text-lg font-semibold text-text-primary">Deposits</h2>
                 <div className="flex items-center gap-2">
                   <button onClick={syncPendingDeposits} className="p-2 rounded-xl bg-accent/10 hover:bg-accent/20 text-accent transition-colors" title="Sync pending deposits with Marz">
                     {txLoading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
@@ -706,7 +789,7 @@ export default function AdminDashboard() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-cream-border">
-                        {['User', 'Amount', 'Provider', 'Reference', 'Date', 'Status', 'Actions'].map(h => (
+                        {['User', 'Amount', 'Provider', 'Reference', 'Date', 'Status'].map(h => (
                           <th key={h} className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3 pr-4">{h}</th>
                         ))}
                       </tr>
@@ -726,20 +809,72 @@ export default function AdminDashboard() {
                             {new Date(tx.created_at).toLocaleDateString()}
                           </td>
                           <td className="py-4 pr-4"><StatusBadge status={tx.status} /></td>
-                          <td className="py-4">
-                            <div className="flex items-center gap-2">
-                              <button onClick={() => approveTransaction(tx.id, tx.type)} className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20" title="Approve">
-                                <CheckCircle2 size={16} />
-                              </button>
-                              <button onClick={() => rejectTransaction(tx.id)} className="p-1.5 rounded-lg bg-status-error/10 text-status-error hover:bg-status-error/20" title="Reject">
-                                <XCircle size={16} />
-                              </button>
-                            </div>
-                          </td>
                         </tr>
                       ))}
                       {pendingDeposits.length === 0 && (
-                        <tr><td colSpan={7} className="py-10 text-center text-sm text-text-secondary">No pending deposits awaiting approval</td></tr>
+                        <tr><td colSpan={6} className="py-10 text-center text-sm text-text-secondary">No deposits in the system yet</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── INVESTMENTS ── */}
+        {activeTab === 'investments' && (
+          <div className="space-y-6">
+            <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-text-primary">Investment Management</h2>
+                <button onClick={loadInvestments} className="p-2 rounded-xl bg-accent/10 hover:bg-accent/20 text-accent transition-colors">
+                  {invLoading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
+                </button>
+              </div>
+              {invLoading ? (
+                <div className="flex justify-center py-10"><Loader2 className="animate-spin text-accent" size={28} /></div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-cream-border">
+                        {['User', 'Plan', 'Amount', 'Daily ROI', 'Started', 'Last Earning', 'Status', 'Actions'].map(h => (
+                          <th key={h} className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3 pr-4 whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-cream-border">
+                      {investments.map(inv => (
+                        <tr key={inv.id}>
+                          <td className="py-4 text-sm font-medium text-text-primary pr-4 whitespace-nowrap">
+                            {inv.profiles?.full_name || inv.profiles?.email || '—'}
+                          </td>
+                          <td className="py-4 text-sm text-text-secondary pr-4">{inv.plan_name}</td>
+                          <td className="py-4 text-sm text-text-primary pr-4">{formatDualCurrency(inv.amount)}</td>
+                          <td className="py-4 text-sm text-accent pr-4">{inv.daily_roi}%</td>
+                          <td className="py-4 text-sm text-text-secondary pr-4 whitespace-nowrap">
+                            {new Date(inv.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="py-4 text-sm text-text-secondary pr-4 whitespace-nowrap">
+                            {inv.last_earning_at ? new Date(inv.last_earning_at).toLocaleDateString() : '—'}
+                          </td>
+                          <td className="py-4 pr-4"><StatusBadge status={inv.status} /></td>
+                          <td className="py-4">
+                            {inv.status === 'active' && (
+                              <button
+                                onClick={() => cancelInvestment(inv.id)}
+                                className="p-1.5 rounded-lg bg-status-error/10 text-status-error hover:bg-status-error/20 transition-colors"
+                                title="Cancel Investment & Refund"
+                              >
+                                <XCircle size={16} />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {investments.length === 0 && (
+                        <tr><td colSpan={8} className="py-10 text-center text-sm text-text-secondary">No investments in the system yet</td></tr>
                       )}
                     </tbody>
                   </table>

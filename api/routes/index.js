@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { marzRouter } from './marz.js'
 import { earningsRouter } from './earnings.js'
+import { adminApiRouter } from './admin.js'
 
 const router = Router()
 
@@ -13,6 +14,9 @@ router.use('/webhooks/marz', marzRouter)
 
 // Daily earnings processing
 router.use('/earnings', earningsRouter)
+
+// Admin API routes
+router.use('/admin', adminApiRouter)
 
 router.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
