@@ -49,13 +49,18 @@ export default function WithdrawPage() {
         formattedPhone = '+256' + formattedPhone
       }
 
+      if (!user?.id) {
+        setError('You must be logged in to make a withdrawal')
+        return
+      }
+
       const result = await initiateWithdrawal({
         amount: parseFloat(amount),
         currency: 'UGX',
         phone: formattedPhone,
         provider,
         reference: `WD-${Date.now()}`,
-        user_id: user?.id ?? 'guest',
+        user_id: user.id,
       })
 
       setStatus('waiting')
