@@ -222,6 +222,44 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Refresh balance based ONLY on verified Marz Pay deposits and withdrawals.
+-- If a user has never made a deposit through the system, their balance is forced to 0.
+CREATE OR REPLACE FUNCTION public.refresh_marz_verified_balance(p_user_id UUID)
+RETURNS VOID AS $$
+DECLARE
+  v_has_deposits BOOLEAN;
+  v_new_balance NUMERIC := 0;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1 FROM public.transactions
+    WHERE user_id = p_user_id
+      AND type = 'deposit'
+      AND status IN ('completed', 'approved')
+  ) INTO v_has_deposits;
+
+  IF NOT v_has_deposits THEN
+    UPDATE public.profiles
+    SET balance = 0
+    WHERE id = p_user_id;
+    RETURN;
+  END IF;
+
+  SELECT coalesce(sum(
+    CASE
+      WHEN type = 'deposit' AND status IN ('completed', 'approved') THEN amount
+      WHEN type = 'withdrawal' AND status IN ('completed', 'approved', 'pending_approval') THEN -amount
+      ELSE 0
+    END
+  ), 0) INTO v_new_balance
+  FROM public.transactions
+  WHERE user_id = p_user_id;
+
+  UPDATE public.profiles
+  SET balance = v_new_balance
+  WHERE id = p_user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Recalculate all balances
 CREATE OR REPLACE FUNCTION public.recalculate_all_balances()
 RETURNS TABLE(user_id UUID, old_balance NUMERIC, new_balance NUMERIC) AS $$
@@ -230,7 +268,7 @@ DECLARE
 BEGIN
   FOR r IN SELECT id, balance FROM public.profiles LOOP
     RETURN QUERY
-    SELECT r.id, r.balance, public.recalculate_balance(r.id);
+    SELECT r.id, r.balance, public.refresh_marz_verified_balance(r.id);
   END LOOP;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -360,6 +398,7 @@ GRANT EXECUTE ON FUNCTION public.increment_balance(UUID, NUMERIC) TO authenticat
 GRANT EXECUTE ON FUNCTION public.process_referral_bonus(UUID, NUMERIC) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.process_registration_bonus(UUID) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.recalculate_balance(UUID) TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.refresh_marz_verified_balance(UUID) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.recalculate_all_balances() TO authenticated, anon;
 
 -- ==========================================

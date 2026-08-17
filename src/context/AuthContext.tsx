@@ -55,6 +55,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = async () => {
     if (user) {
+      try {
+        await supabase.rpc('refresh_marz_verified_balance', { p_user_id: user.id })
+      } catch (err) {
+        console.error('Balance verification error:', err)
+      }
       const p = await fetchProfile(user.id)
       setProfile(p)
     }
@@ -66,6 +71,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
+        try {
+          await supabase.rpc('refresh_marz_verified_balance', { p_user_id: session.user.id })
+        } catch (err) {
+          console.error('Balance verification error:', err)
+        }
         const p = await fetchProfile(session.user.id)
         setProfile(p)
       }
@@ -77,12 +87,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
+        try {
+          await supabase.rpc('refresh_marz_verified_balance', { p_user_id: session.user.id })
+        } catch (err) {
+          console.error('Balance verification error:', err)
+        }
         const p = await fetchProfile(session.user.id)
         setProfile(p)
       } else {
         setProfile(null)
       }
-      setIsLoading(false)
     })
 
     return () => subscription.unsubscribe()
