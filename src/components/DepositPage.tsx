@@ -68,6 +68,9 @@ export default function DepositPage() {
         return
       }
 
+      // Trigger backend sync with Marz
+      fetch('/api/marz/sync', { method: 'POST' }).catch(() => {})
+
       const interval = setInterval(async () => {
         try {
           const statusResult = await getTransactionStatus(txRef)

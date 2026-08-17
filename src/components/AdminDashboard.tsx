@@ -191,49 +191,32 @@ export default function AdminDashboard() {
   }
 
   const syncPendingDeposits = async () => {
-    if (!window.confirm('This will check all pending deposits against Marz Innovations and update their status. Continue?')) return
+    if (!window.confirm('This will check all pending deposits and withdrawals against Marz Innovations and update their status. Continue?')) return
     setTxLoading(true)
     try {
-      const { data: pendingDeposits } = await supabase
-        .from('transactions')
-        .select('id, reference, amount, user_id')
-        .eq('type', 'deposit')
-        .in('status', ['pending', 'pending_approval'])
-
-      if (!pendingDeposits || pendingDeposits.length === 0) {
-        alert('No pending deposits to sync.')
-        setTxLoading(false)
-        return
+      const res = await fetch('/api/marz/sync', { method: 'POST' })
+      if (res.ok) {
+        const data = await res.json()
+        alert(`Sync complete. ${data.synced || 0} transactions updated out of ${data.total || 0} pending.`)
+      } else {
+        alert('Failed to sync with Marz.')
       }
-
-      let synced = 0
-      for (const tx of pendingDeposits) {
-        try {
-          const res = await fetch(`/api/marz/transaction/${encodeURIComponent(tx.reference || '')}`)
-          if (res.ok) {
-            const data = await res.json()
-            const status = String(data.status || data.data?.status || '').toLowerCase()
-            if (['completed', 'success', 'paid', 'credited', 'successful'].includes(status)) {
-              await supabase.from('transactions').update({ status: 'pending_approval' }).eq('id', tx.id)
-              synced++
-            } else if (['failed', 'rejected', 'cancelled', 'expired'].includes(status)) {
-              await supabase.from('transactions').update({ status: 'rejected' }).eq('id', tx.id)
-              synced++
-            }
-          }
-        } catch (err) {
-          console.error('Error syncing deposit', tx.reference, err)
-        }
-      }
-
-      alert(`Sync complete. ${synced} deposits updated.`)
       loadTransactions()
     } catch (err) {
-      console.error('Error syncing deposits:', err)
-      alert('Failed to sync deposits.')
+      console.error('Error syncing:', err)
+      alert('Failed to sync.')
     }
     setTxLoading(false)
   }
+
+  // Auto-sync pending transactions every 30 seconds when on deposit-approvals tab
+  useEffect(() => {
+    if (activeTab !== 'deposit-approvals') return
+    const interval = setInterval(() => {
+      syncPendingDeposits()
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [activeTab])
 
   // ─── Derived stats ────────────────────────────────────────────
   const nonAdminUsers = users.filter(u => u.role !== 'admin')

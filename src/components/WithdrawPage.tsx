@@ -60,6 +60,9 @@ export default function WithdrawPage() {
 
       setStatus('waiting')
 
+      // Trigger backend sync with Marz
+      fetch('/api/marz/sync', { method: 'POST' }).catch(() => {})
+
       const interval = setInterval(async () => {
         try {
           const statusResult = await getTransactionStatus(result.reference)

@@ -154,6 +154,69 @@ marzRouter.post('/disburse', async (req, res) => {
 })
 
 // ---------------------------------------------------------------------------
+// POST /api/marz/sync  — automatic sync pending deposits/withdrawals with Marz
+// ---------------------------------------------------------------------------
+marzRouter.post('/sync', async (req, res) => {
+  try {
+    const { data: pendingDeposits } = await supabaseAdmin
+      .from('transactions')
+      .select('id, reference, amount, user_id, type')
+      .eq('type', 'deposit')
+      .in('status', ['pending', 'pending_approval'])
+
+    const { data: pendingWithdrawals } = await supabaseAdmin
+      .from('transactions')
+      .select('id, reference, amount, user_id, type')
+      .eq('type', 'withdrawal')
+      .eq('status', 'pending')
+
+    const allPending = [...(pendingDeposits || []), ...(pendingWithdrawals || [])]
+
+    if (allPending.length === 0) {
+      return res.status(200).json({ synced: 0, message: 'No pending transactions to sync' })
+    }
+
+    let synced = 0
+    for (const tx of allPending) {
+      if (!tx.reference) continue
+      try {
+        const statusRes = await fetch(`${marzConfig.baseUrl}/transaction/${encodeURIComponent(tx.reference)}`, {
+          headers: getMarzAuthHeaders(),
+        })
+        if (!statusRes.ok) continue
+        const statusData = await statusRes.json()
+        const status = String(statusData.status || statusData.data?.status || '').toLowerCase()
+
+        if (tx.type === 'deposit') {
+          if (['completed', 'success', 'paid', 'credited', 'successful'].includes(status)) {
+            await supabaseAdmin.from('transactions').update({ status: 'pending_approval' }).eq('id', tx.id)
+            synced++
+          } else if (['failed', 'rejected', 'cancelled', 'expired'].includes(status)) {
+            await supabaseAdmin.from('transactions').update({ status: 'rejected' }).eq('id', tx.id)
+            synced++
+          }
+        } else if (tx.type === 'withdrawal') {
+          if (['completed', 'success', 'paid', 'credited', 'successful'].includes(status)) {
+            await supabaseAdmin.from('transactions').update({ status: 'completed' }).eq('id', tx.id)
+            synced++
+          } else if (['failed', 'rejected', 'cancelled', 'expired'].includes(status)) {
+            await supabaseAdmin.from('transactions').update({ status: 'rejected' }).eq('id', tx.id)
+            synced++
+          }
+        }
+      } catch (err) {
+        console.error('[MARZ] sync error for reference', tx.reference, err)
+      }
+    }
+
+    res.status(200).json({ synced, total: allPending.length })
+  } catch (error) {
+    console.error('[MARZ] sync error', error.message)
+    res.status(500).json({ message: 'Sync failed', details: error.message })
+  }
+})
+
+// ---------------------------------------------------------------------------
 // GET /api/marz/health  — diagnostic + Marz credentials check
 // ---------------------------------------------------------------------------
 marzRouter.get('/health', async (req, res) => {
