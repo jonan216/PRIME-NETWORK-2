@@ -14,7 +14,7 @@ interface Package {
 }
 
 export default function PackagesPage() {
-  const { profile } = useAuth()
+  const { profile, refreshProfile } = useAuth()
   const [showAddForm, setShowAddForm] = useState(false)
   const [amount, setAmount] = useState('')
   const [packages, setPackages] = useState<Package[]>([])
@@ -52,16 +52,21 @@ export default function PackagesPage() {
     if (!profile?.id) return
     setError('')
 
-    if ((profile?.balance ?? 0) < 5000) {
-      setError('Your account balance must be at least UGX 5,000 to add a package.')
+    const numAmount = parseFloat(amount)
+    const dailyRoi = 1.5
+    const planName = 'Prime Daily Earning'
+
+    if (isNaN(numAmount) || numAmount < 5000) {
+      setError('Minimum investment amount is UGX 5,000')
+      return
+    }
+
+    if ((profile?.balance ?? 0) < numAmount) {
+      setError(`Insufficient balance. You need UGX ${numAmount.toLocaleString()} but your available balance is UGX ${(profile?.balance ?? 0).toLocaleString()}.`)
       return
     }
 
     setSubmitting(true)
-
-    const numAmount = parseFloat(amount)
-    const dailyRoi = 1.5
-    const planName = 'Prime Daily Earning'
 
     const { data, error } = await supabase.from('investments').insert({
       user_id: profile.id,
@@ -82,12 +87,14 @@ export default function PackagesPage() {
       setPackages(prev => [data, ...prev])
       ;(async () => {
         try {
+          await supabase.rpc('increment_balance', { p_user_id: profile.id, p_amount: -numAmount })
           const { error: rpcError } = await supabase.rpc('process_referral_bonus', { p_investor_id: profile.id, p_amount: numAmount })
           if (rpcError) console.error('Referral bonus error:', mapSupabaseError(rpcError))
         } catch (err) {
-          console.error('Referral bonus error:', err as any)
+          console.error('Balance deduction error:', err as any)
         }
       })()
+      refreshProfile()
     }
 
     setShowAddForm(false)
