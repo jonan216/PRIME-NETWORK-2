@@ -1,16 +1,16 @@
 -- ==========================================
 -- PRIME NETWORK - BACKFILL DEPOSITS
 -- Run this ONCE in Supabase SQL Editor
--- to fix existing deposits that may be stuck
--- in 'pending' status instead of 'pending_approval'
+-- to fix existing deposits for the new
+-- auto-complete behavior
 -- ==========================================
 
--- Update all existing deposits that are in 'pending' status to 'pending_approval'
--- This assumes all deposits that were initiated through the system should go through admin approval
+-- Convert old pending_approval deposits back to pending
+-- so the sync endpoint can auto-complete them if Marz confirms
 UPDATE public.transactions
-SET status = 'pending_approval'
+SET status = 'pending'
 WHERE type = 'deposit'
-  AND status = 'pending';
+  AND status = 'pending_approval';
 
 -- Show summary
 SELECT
@@ -20,22 +20,16 @@ FROM public.transactions
 WHERE type = 'deposit'
 UNION ALL
 SELECT
-  'Pending approval' AS metric,
-  COUNT(*) AS count
-FROM public.transactions
-WHERE type = 'deposit' AND status = 'pending_approval'
-UNION ALL
-SELECT
-  'Pending (old)' AS metric,
+  'Pending' AS metric,
   COUNT(*) AS count
 FROM public.transactions
 WHERE type = 'deposit' AND status = 'pending'
 UNION ALL
 SELECT
-  'Approved' AS metric,
+  'Completed' AS metric,
   COUNT(*) AS count
 FROM public.transactions
-WHERE type = 'deposit' AND status = 'approved'
+WHERE type = 'deposit' AND status = 'completed'
 UNION ALL
 SELECT
   'Rejected' AS metric,

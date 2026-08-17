@@ -228,7 +228,7 @@ marzRouter.post('/sync', async (req, res) => {
     for (const tx of allPending) {
       if (!tx.reference) continue
       try {
-        const statusRes = await fetch(`${marzConfig.baseUrl}/transaction/${encodeURIComponent(tx.reference)}`, {
+        const statusRes = await fetch(`${marzConfig.baseUrl}/transactions/${encodeURIComponent(tx.reference)}`, {
           headers: getMarzAuthHeaders(),
         })
         if (!statusRes.ok) {

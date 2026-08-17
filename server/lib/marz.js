@@ -85,7 +85,7 @@ export async function initiateDisburse(payload) {
 
 export async function getTransactionStatus(reference) {
   const response = await axios.get(
-    `${marzConfig.baseUrl}/transaction/${encodeURIComponent(reference)}`,
+    `${marzConfig.baseUrl}/transactions/${encodeURIComponent(reference)}`,
     { headers: getMarzAuthHeaders() }
   )
   return response.data
