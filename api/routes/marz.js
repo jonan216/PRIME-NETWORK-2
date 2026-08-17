@@ -83,16 +83,17 @@ marzRouter.post('/collect-money', async (req, res) => {
 
     if (user_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user_id)) {
       await ensureProfileExists(user_id)
-      supabaseAdmin.from('transactions').insert({
-        user_id,
-        type: 'deposit',
-        amount: ugxAmount,
-        status: 'pending',
-        provider: normalizeProvider(provider),
-        reference: reference_,
-      }).then(({ error: txError }) => {
-        if (txError) console.error('[MARZ] failed to create pending deposit tx:', txError.message || txError)
-      })
+      const { error: txError } = await supabaseAdmin
+        .from('transactions')
+        .insert({
+          user_id,
+          type: 'deposit',
+          amount: ugxAmount,
+          status: 'pending',
+          provider: normalizeProvider(provider),
+          reference: reference_,
+        })
+      if (txError) console.error('[MARZ] failed to create pending deposit tx:', txError.message || txError)
     } else {
       console.warn('[MARZ] skipped creating pending deposit tx because user_id is missing or invalid:', user_id)
     }
@@ -158,16 +159,17 @@ marzRouter.post('/disburse', async (req, res) => {
 
     if (user_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user_id)) {
       await ensureProfileExists(user_id)
-      supabaseAdmin.from('transactions').insert({
-        user_id,
-        type: 'withdrawal',
-        amount: ugxAmount,
-        status: 'pending',
-        provider: normalizeProvider(provider),
-        reference: reference_,
-      }).then(({ error: txError }) => {
-        if (txError) console.error('[MARZ] failed to create pending withdrawal tx:', txError.message || txError)
-      })
+      const { error: txError } = await supabaseAdmin
+        .from('transactions')
+        .insert({
+          user_id,
+          type: 'withdrawal',
+          amount: ugxAmount,
+          status: 'pending',
+          provider: normalizeProvider(provider),
+          reference: reference_,
+        })
+      if (txError) console.error('[MARZ] failed to create pending withdrawal tx:', txError.message || txError)
     } else {
       console.warn('[MARZ] skipped creating pending withdrawal tx because user_id is missing or invalid:', user_id)
     }
