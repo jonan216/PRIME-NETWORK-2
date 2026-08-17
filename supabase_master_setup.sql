@@ -269,7 +269,7 @@ DECLARE
   v_earning_amount NUMERIC;
   v_today INTEGER;
 BEGIN
-  v_today := EXTRACT(ISODOW FROM NOW())
+  v_today := EXTRACT(ISODOW FROM NOW());
   IF v_today NOT IN (1, 2, 3, 4, 5) THEN
     RETURN;
   END IF;
