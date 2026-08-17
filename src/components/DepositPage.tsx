@@ -47,6 +47,11 @@ export default function DepositPage() {
         return
       }
 
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)) {
+        setError('Invalid user session. Please log out and log in again.')
+        return
+      }
+
       // Auto-format phone to E.164 (+256XXXXXXXXX) before sending
       let formattedPhone = phone.replace(/\D/g, '')
       if (formattedPhone.startsWith('0') && formattedPhone.length === 10) {

@@ -187,7 +187,12 @@ marzRouter.post('/sync', async (req, res) => {
         const statusRes = await fetch(`${marzConfig.baseUrl}/transaction/${encodeURIComponent(tx.reference)}`, {
           headers: getMarzAuthHeaders(),
         })
-        if (!statusRes.ok) continue
+        if (!statusRes.ok) {
+          if (statusRes.status === 404) {
+            continue
+          }
+          continue
+        }
         const statusData = await statusRes.json()
         const status = String(statusData.status || statusData.data?.status || '').toLowerCase()
 
