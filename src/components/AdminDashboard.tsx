@@ -69,6 +69,11 @@ export default function AdminDashboard() {
   // Load on mount and on tab change
   useEffect(() => { loadUsers() }, [loadUsers])
   useEffect(() => { loadTransactions() }, [loadTransactions])
+  useEffect(() => {
+    if (activeTab === 'deposit-approvals') {
+      loadTransactions()
+    }
+  }, [activeTab, loadTransactions])
 
   // Real-time notification for new deposits
   useEffect(() => {

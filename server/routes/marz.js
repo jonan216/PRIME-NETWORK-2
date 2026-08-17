@@ -46,7 +46,7 @@ marzRouter.post('/collect-money', async (req, res) => {
 
     const isSandbox = Boolean(response.data?.data?.sandbox_mode || response.data?.sandbox_mode)
 
-    if (user_id) {
+    if (user_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user_id)) {
       supabaseAdmin.from('transactions').insert({
         user_id,
         type: 'deposit',
@@ -57,6 +57,8 @@ marzRouter.post('/collect-money', async (req, res) => {
       }).then(({ error: txError }) => {
         if (txError) console.error('[MARZ] failed to create pending deposit tx:', txError.message || txError)
       })
+    } else {
+      console.warn('[MARZ] skipped creating pending deposit tx because user_id is missing or invalid:', user_id)
     }
 
     return res.status(200).json({
@@ -110,7 +112,7 @@ marzRouter.post('/disburse', async (req, res) => {
       headers: getMarzAuthHeaders(),
     })
 
-    if (user_id) {
+    if (user_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user_id)) {
       supabaseAdmin.from('transactions').insert({
         user_id,
         type: 'withdrawal',
@@ -121,6 +123,8 @@ marzRouter.post('/disburse', async (req, res) => {
       }).then(({ error: txError }) => {
         if (txError) console.error('[MARZ] failed to create pending withdrawal tx:', txError.message || txError)
       })
+    } else {
+      console.warn('[MARZ] skipped creating pending withdrawal tx because user_id is missing or invalid:', user_id)
     }
 
     return res.status(200).json({
