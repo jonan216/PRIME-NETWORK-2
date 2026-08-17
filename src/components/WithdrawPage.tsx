@@ -49,13 +49,19 @@ export default function WithdrawPage() {
         formattedPhone = '+256' + formattedPhone
       }
 
+      const parsedAmount = parseFloat(amount)
+      if (isNaN(parsedAmount) || parsedAmount < 10000) {
+        setError('Minimum withdrawal amount is UGX 10,000')
+        return
+      }
+
       if (!user?.id) {
         setError('You must be logged in to make a withdrawal')
         return
       }
 
       const result = await initiateWithdrawal({
-        amount: parseFloat(amount),
+        amount: parsedAmount,
         currency: 'UGX',
         phone: formattedPhone,
         provider,

@@ -140,6 +140,11 @@ marzRouter.post('/disburse', async (req, res) => {
     }
 
     const ugxAmount = Math.round(parseFloat(amount))
+
+    if (ugxAmount < 10000) {
+      return res.status(400).json({ message: 'Minimum withdrawal amount is UGX 10,000' })
+    }
+
     const reference_ = isValidUuid(reference) ? reference : crypto.randomUUID()
 
     const payload = {
