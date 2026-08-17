@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { ShieldCheck, Wallet, Building2, CreditCard, ArrowRight, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { initiateDeposit, getTransactionStatus } from '../lib/marzApi'
 import { useAuth } from '../context/AuthContext'
-import { supabase } from '../lib/supabaseClient'
 import { formatDualCurrency } from '../lib/currency'
 
 
@@ -99,30 +98,8 @@ export default function DepositPage() {
 
           if (['credited', 'completed', 'successful', 'paid', 'success', 'sandbox'].includes(txStatus)) {
             clearInterval(interval)
-            setStatus('pending_approval')
-
-            const approvalInterval = setInterval(async () => {
-              try {
-                const { data } = await supabase
-                  .from('transactions')
-                  .select('status')
-                  .eq('reference', txRef)
-                  .single()
-
-                if (data?.status === 'approved') {
-                  clearInterval(approvalInterval)
-                  setStatus('completed')
-                  refreshProfile()
-                } else if (data?.status === 'rejected') {
-                  clearInterval(approvalInterval)
-                  setStatus('failed')
-                }
-              } catch {
-                // keep polling
-              }
-            }, 3000)
-
-            setTimeout(() => clearInterval(approvalInterval), 180000)
+            setStatus('completed')
+            refreshProfile()
           } else if (['failed', 'rejected', 'cancelled', 'expired'].includes(txStatus)) {
             setStatus('failed')
             clearInterval(interval)

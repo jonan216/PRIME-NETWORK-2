@@ -242,7 +242,8 @@ marzRouter.post('/sync', async (req, res) => {
 
         if (tx.type === 'deposit') {
           if (['completed', 'success', 'paid', 'credited', 'successful'].includes(status)) {
-            await supabaseAdmin.from('transactions').update({ status: 'pending_approval' }).eq('id', tx.id)
+            await supabaseAdmin.rpc('increment_balance', { p_user_id: tx.user_id, p_amount: tx.amount || 0 }).catch(err => console.error('[MARZ] sync auto-credit balance error:', err.message || err))
+            await supabaseAdmin.from('transactions').update({ status: 'completed' }).eq('id', tx.id)
             synced++
           } else if (['failed', 'rejected', 'cancelled', 'expired'].includes(status)) {
             await supabaseAdmin.from('transactions').update({ status: 'rejected' }).eq('id', tx.id)
@@ -365,12 +366,11 @@ marzRouter.post(['/webhook', '/'], async (req, res) => {
 
       if (existingTx) {
         if (existingTx.type === 'deposit') {
-          const newStatus = isSuccess ? 'pending_approval' : 'rejected'
-          if (existingTx.status !== newStatus) {
-            await supabaseAdmin
-              .from('transactions')
-              .update({ status: newStatus })
-              .eq('id', existingTx.id)
+          if (isSuccess) {
+            await supabaseAdmin.rpc('increment_balance', { p_user_id: existingTx.user_id, p_amount: existingTx.amount || 0 }).catch(err => console.error('[MARZ] auto-credit balance error:', err.message || err))
+            await supabaseAdmin.from('transactions').update({ status: 'completed' }).eq('id', existingTx.id)
+          } else {
+            await supabaseAdmin.from('transactions').update({ status: 'rejected' }).eq('id', existingTx.id)
           }
         } else if (existingTx.type === 'withdrawal') {
           const newStatus = isSuccess ? 'completed' : 'rejected'
@@ -396,13 +396,13 @@ marzRouter.post(['/webhook', '/'], async (req, res) => {
             user_id: userId,
             type: txType,
             amount,
-            status: txType === 'deposit' ? 'pending_approval' : 'completed',
+            status: txType === 'deposit' ? 'completed' : 'completed',
             provider: event.provider || event.channel || null,
             reference,
           })
 
           if (txType === 'deposit') {
-            // Do NOT increment balance here; admin must approve first
+            await supabaseAdmin.rpc('increment_balance', { p_user_id: userId, p_amount: amount }).catch(err => console.error('[MARZ] auto-credit balance error:', err.message || err))
           }
         }
       }
