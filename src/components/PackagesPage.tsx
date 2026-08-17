@@ -51,6 +51,12 @@ export default function PackagesPage() {
     e.preventDefault()
     if (!profile?.id) return
     setError('')
+
+    if ((profile?.balance ?? 0) < 5000) {
+      setError('Your account balance must be at least UGX 5,000 to add a package.')
+      return
+    }
+
     setSubmitting(true)
 
     const numAmount = parseFloat(amount)
