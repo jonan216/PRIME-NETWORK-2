@@ -107,49 +107,50 @@ export default function PackagesPage() {
       return
     }
 
-    if (data) {
-      setPackages(prev => [data, ...prev])
-
-      const investmentTx = {
-        id: crypto.randomUUID(),
-        user_id: profile.id,
-        type: 'investment',
-        amount: numAmount,
-        status: 'active',
-        provider: null,
-        reference: `INV-${data.id}`,
-        created_at: new Date().toISOString(),
-      }
-
-      try {
-        const { error: balanceError } = await supabase.rpc('increment_balance', { p_user_id: profile.id, p_amount: -numAmount })
-        if (balanceError) {
-          console.error('Balance deduction failed, rolling back package creation:', balanceError)
-          await supabase.from('investments').delete().eq('id', data.id)
-          setPackages(prev => prev.filter(p => p.id !== data.id))
-          setError('Failed to deduct balance. Package creation cancelled.')
-          setSubmitting(false)
-          return
-        }
-
-        const { error: txError } = await supabase.from('transactions').insert(investmentTx)
-        if (txError) {
-          console.error('Investment transaction error:', txError)
-        } else {
-          setTransactions(prev => [investmentTx, ...prev])
-        }
-
-        const { error: rpcError } = await supabase.rpc('process_referral_bonus', { p_investor_id: profile.id, p_amount: numAmount })
-        if (rpcError) console.error('Referral bonus error:', mapSupabaseError(rpcError))
-      } catch (err) {
-        console.error('Balance deduction error:', err as any)
-      }
-
-      refreshProfile()
+    if (!data) {
+      setError('Failed to add package: no data returned')
+      return
     }
 
-    setShowAddForm(false)
-    setAmount('')
+    setPackages(prev => [data, ...prev])
+
+    const investmentTx = {
+      id: crypto.randomUUID(),
+      user_id: profile.id,
+      type: 'investment',
+      amount: numAmount,
+      status: 'active',
+      provider: null,
+      reference: `INV-${data.id}`,
+      created_at: new Date().toISOString(),
+    }
+
+    try {
+      const { error: balanceError } = await supabase.rpc('increment_balance', { p_user_id: profile.id, p_amount: -numAmount })
+      if (balanceError) {
+        console.error('Balance deduction failed, rolling back package creation:', balanceError)
+        await supabase.from('investments').delete().eq('id', data.id)
+        setPackages(prev => prev.filter(p => p.id !== data.id))
+        setError('Failed to deduct balance. Package creation cancelled.')
+        return
+      }
+
+      const { error: txError } = await supabase.from('transactions').insert(investmentTx)
+      if (txError) {
+        console.error('Investment transaction error:', txError)
+      } else {
+        setTransactions(prev => [investmentTx, ...prev])
+      }
+
+      const { error: rpcError } = await supabase.rpc('process_referral_bonus', { p_investor_id: profile.id, p_amount: numAmount })
+      if (rpcError) console.error('Referral bonus error:', mapSupabaseError(rpcError))
+    } catch (err) {
+      console.error('Balance deduction error:', err as any)
+    }
+
+    setTimeout(() => {
+      refreshProfile()
+    }, 500)
   }
 
   return (
