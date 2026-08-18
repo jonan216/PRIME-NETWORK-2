@@ -308,7 +308,7 @@ marzRouter.get('/transaction/:reference', async (req, res) => {
   try {
     const { reference } = req.params
     const response = await axios.get(
-      `${marzConfig.baseUrl}/transaction/${encodeURIComponent(reference)}`,
+      `${marzConfig.baseUrl}/transactions/${encodeURIComponent(reference)}`,
       { headers: getMarzAuthHeaders() }
     )
     return res.status(200).json(response.data)

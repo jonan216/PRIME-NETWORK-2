@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { formatDualCurrency } from '../lib/currency'
 
 
-type PaymentStatus = 'idle' | 'pending' | 'waiting' | 'pending_approval' | 'completed' | 'failed'
+type PaymentStatus = 'idle' | 'pending' | 'waiting' | 'completed' | 'failed'
 
 export default function DepositPage() {
   const { user, profile, refreshProfile } = useAuth()
@@ -145,18 +145,18 @@ export default function DepositPage() {
                   Make Another Deposit
                 </button>
               </div>
-            ) : status === 'pending_approval' ? (
+            ) : status === 'failed' ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="w-16 h-16 rounded-full bg-status-warning/10 flex items-center justify-center mb-4">
-                  <Loader2 size={32} className="text-status-warning animate-spin" />
+                <div className="w-16 h-16 rounded-full bg-status-error/10 flex items-center justify-center mb-4">
+                  <XCircle size={32} className="text-status-error" />
                 </div>
-                <h3 className="text-xl font-semibold text-text-primary mb-2">Awaiting Admin Approval</h3>
-                <p className="text-text-secondary mb-6">Your payment has been received. An administrator will approve it shortly.</p>
+                <h3 className="text-xl font-semibold text-text-primary mb-2">Payment Failed</h3>
+                <p className="text-text-secondary mb-6">Your payment could not be processed. Please try again.</p>
                 <button
                   onClick={() => { setStatus('idle'); setAmount(''); setPhone('') }}
                   className="px-6 py-3 bg-cream-secondary hover:bg-cream-border text-text-primary rounded-xl font-medium transition-colors"
                 >
-                  Cancel
+                  Try Again
                 </button>
               </div>
             ) : (
