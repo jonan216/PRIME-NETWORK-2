@@ -1,15 +1,53 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Copy, Check, ArrowUpRight, Wallet as WalletIcon } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabaseClient'
 import { formatDualCurrency } from '../lib/currency'
 import { NavLink } from 'react-router-dom'
+
+interface Transaction {
+  id: string
+  type: string
+  amount: number
+  status: string
+  created_at: string
+}
 
 export default function WalletPage() {
   const { profile } = useAuth()
   const [activeTab, setActiveTab] = useState<'overview' | 'transfer' | 'withdraw'>('overview')
   const [copied, setCopied] = useState(false)
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const balance = profile?.balance ?? 0
+  useEffect(() => {
+    async function loadTransactions() {
+      if (!profile?.id) return
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false })
+      if (!error && data) {
+        setTransactions(data)
+      }
+      setLoading(false)
+    }
+    loadTransactions()
+  }, [profile?.id])
+
+  const availableBalance = transactions.reduce((sum, tx) => {
+    const amt = tx.amount || 0
+    if (tx.type === 'deposit' && tx.status === 'completed') return sum + amt
+    if (tx.type === 'withdrawal' && (tx.status === 'completed' || tx.status === 'approved')) return sum - amt
+    if (tx.type === 'investment' && tx.status === 'active') return sum - amt
+    if (tx.type === 'earning' && tx.status === 'completed') return sum + amt
+    if (tx.type === 'referral_reward' && tx.status === 'completed') return sum + amt
+    if (tx.type === 'refund' && tx.status === 'completed') return sum + amt
+    return sum
+  }, 0)
+
   const walletAddress = profile?.id ? `0x${profile.id.replace(/-/g, '').slice(0, 32)}` : '0x71C7656EC7ab88b098defB751B7401B5f6d8976F'
 
   const copyAddress = () => {
@@ -28,7 +66,7 @@ export default function WalletPage() {
       <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <p className="text-xs font-medium text-text-secondary">Available Wallet Balance</p>
-          <p className="text-3xl font-display font-bold text-accent mt-1">{formatDualCurrency(balance)}</p>
+          <p className="text-3xl font-display font-bold text-accent mt-1">{loading ? '...' : formatDualCurrency(availableBalance)}</p>
         </div>
         <div className="flex gap-3">
           <NavLink to="/dashboard/deposit" className="px-4 py-2.5 bg-accent hover:bg-accent-hover text-white rounded-xl text-sm font-medium transition-colors">
