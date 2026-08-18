@@ -78,8 +78,8 @@ export default function DepositPage() {
     try {
       const ugxValue = parseFloat(amount)
 
-      if (isNaN(ugxValue) || ugxValue < 5000) {
-        setError('Minimum deposit amount is UGX 5,000')
+      if (isNaN(ugxValue) || ugxValue < 1000) {
+        setError('Minimum deposit amount is UGX 1,000')
         return
       }
 
@@ -207,12 +207,12 @@ export default function DepositPage() {
                         onChange={e => setAmount(e.target.value)}
                         placeholder="5000"
                         required
-                        min={5000}
+                        min={1000}
                         className="w-full pl-14 pr-4 py-3 bg-cream-secondary border border-cream-border rounded-xl text-text-primary placeholder:text-text-secondary/60 focus:outline-none focus:ring-2 focus:ring-accent/20"
                       />
                   </div>
                   <div className="flex items-center justify-between mt-1 text-xs text-text-secondary">
-                    <span>Minimum deposit: <strong>UGX 5,000</strong></span>
+                    <span>Minimum deposit: <strong>UGX 1,000</strong></span>
                     {amount && parseFloat(amount) > 0 && (
                       <span className="text-accent font-semibold">
                         ≈ ${(parseFloat(amount) / 3700).toFixed(2)} USD
