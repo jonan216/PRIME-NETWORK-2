@@ -57,11 +57,11 @@ export default function DashboardHome() {
 
   const availableBalance = transactions.reduce((sum, tx) => {
     const amount = tx.amount || 0
-    if (tx.type === 'deposit' && tx.status === 'completed') return sum + amount
+    if (tx.type === 'deposit' && (tx.status === 'completed' || tx.status === 'approved')) return sum + amount
     if (tx.type === 'withdrawal' && (tx.status === 'completed' || tx.status === 'approved')) return sum - amount
     if (tx.type === 'investment' && tx.status === 'active') return sum - amount
-    if (tx.type === 'earning' && tx.status === 'completed') return sum + amount
-    if (tx.type === 'referral_reward' && tx.status === 'completed') return sum + amount
+    if (tx.type === 'earning' && (tx.status === 'completed' || tx.status === 'approved')) return sum + amount
+    if (tx.type === 'referral_reward' && (tx.status === 'completed' || tx.status === 'approved')) return sum + amount
     if (tx.type === 'refund' && tx.status === 'completed') return sum + amount
     return sum
   }, 0)

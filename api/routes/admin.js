@@ -263,10 +263,6 @@ adminRouter.post('/transactions/:id/approve', async (req, res) => {
         .from('profiles')
         .update({ balance: (profile.balance || 0) - (tx.amount || 0) })
         .eq('id', tx.user_id)
-    } else if (tx.type === 'deposit') {
-      if (tx.status !== 'completed' && tx.status !== 'approved') {
-        await supabaseAdmin.rpc('increment_balance', { p_user_id: tx.user_id, p_amount: tx.amount || 0 }).catch(err => console.error('Approve deposit error:', err))
-      }
     }
 
     const { error: updateError } = await supabaseAdmin

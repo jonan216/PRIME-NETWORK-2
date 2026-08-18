@@ -182,16 +182,6 @@ export default function AdminDashboard() {
           return
         }
       }
-    } else if (type === 'deposit') {
-      const { data: tx } = await supabase
-        .from('transactions')
-        .select('amount, user_id, status')
-        .eq('id', txId)
-        .single()
-
-      if (tx && tx.user_id && tx.status !== 'completed' && tx.status !== 'approved') {
-        await supabase.rpc('increment_balance', { p_user_id: tx.user_id, p_amount: tx.amount || 0 })
-      }
     }
 
     const { error } = await supabase.from('transactions').update({ status: 'approved' }).eq('id', txId)

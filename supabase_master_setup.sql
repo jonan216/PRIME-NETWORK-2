@@ -417,6 +417,41 @@ CREATE TRIGGER set_referral_code
   BEFORE INSERT ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION public.generate_referral_code_trigger();
 
+-- Auto-update balance when a transaction is approved by admin
+CREATE OR REPLACE FUNCTION public.handle_transaction_approval()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.status = 'approved' AND OLD.status <> 'approved' THEN
+    IF NEW.type = 'deposit' THEN
+      UPDATE public.profiles
+      SET balance = coalesce(balance, 0) + (NEW.amount || 0)
+      WHERE id = NEW.user_id;
+    ELSIF NEW.type = 'withdrawal' THEN
+      UPDATE public.profiles
+      SET balance = coalesce(balance, 0) - (NEW.amount || 0)
+      WHERE id = NEW.user_id;
+    ELSIF NEW.type = 'investment' THEN
+      UPDATE public.profiles
+      SET balance = coalesce(balance, 0) - (NEW.amount || 0)
+      WHERE id = NEW.user_id;
+    ELSIF NEW.type = 'earning' THEN
+      UPDATE public.profiles
+      SET balance = coalesce(balance, 0) + (NEW.amount || 0)
+      WHERE id = NEW.user_id;
+    ELSIF NEW.type = 'referral_reward' THEN
+      UPDATE public.profiles
+      SET balance = coalesce(balance, 0) + (NEW.amount || 0)
+      WHERE id = NEW.user_id;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_transaction_approved
+  AFTER UPDATE ON public.transactions
+  FOR EACH ROW EXECUTE FUNCTION public.handle_transaction_approval();
+
 -- ==========================================
 -- 6. ENABLE RLS
 -- ==========================================

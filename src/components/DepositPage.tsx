@@ -56,11 +56,11 @@ export default function DepositPage() {
 
   const availableBalance = transactions.reduce((sum, tx) => {
     const amt = tx.amount || 0
-    if (tx.type === 'deposit' && tx.status === 'completed') return sum + amt
+    if (tx.type === 'deposit' && (tx.status === 'completed' || tx.status === 'approved')) return sum + amt
     if (tx.type === 'withdrawal' && (tx.status === 'completed' || tx.status === 'approved')) return sum - amt
     if (tx.type === 'investment' && tx.status === 'active') return sum - amt
-    if (tx.type === 'earning' && tx.status === 'completed') return sum + amt
-    if (tx.type === 'referral_reward' && tx.status === 'completed') return sum + amt
+    if (tx.type === 'earning' && (tx.status === 'completed' || tx.status === 'approved')) return sum + amt
+    if (tx.type === 'referral_reward' && (tx.status === 'completed' || tx.status === 'approved')) return sum + amt
     if (tx.type === 'refund' && tx.status === 'completed') return sum + amt
     return sum
   }, 0)
