@@ -55,10 +55,17 @@ export default function DashboardHome() {
     loadDashboardData()
   }, [profile?.id])
 
-  const availableBalance = profile?.balance ?? 0
-  const totalInvested = investments
-    .filter(i => i.status === 'active')
-    .reduce((sum, inv) => sum + (inv.amount || 0), 0)
+  const availableBalance = transactions.reduce((sum, tx) => {
+    const amount = tx.amount || 0
+    if (tx.type === 'deposit' && tx.status === 'completed') return sum + amount
+    if (tx.type === 'withdrawal' && (tx.status === 'completed' || tx.status === 'approved')) return sum - amount
+    if (tx.type === 'investment' && tx.status === 'active') return sum - amount
+    if (tx.type === 'earning' && tx.status === 'completed') return sum + amount
+    if (tx.type === 'referral_reward' && tx.status === 'completed') return sum + amount
+    if (tx.type === 'refund' && tx.status === 'completed') return sum + amount
+    return sum
+  }, 0)
+  const totalInvested = investments.filter(i => i.status === 'active').reduce((sum, inv) => sum + (inv.amount || 0), 0)
 
   const stats = [
     { label: 'Available Balance', value: formatDualCurrency(availableBalance), icon: Wallet, color: 'text-accent' },
