@@ -288,7 +288,7 @@ BEGIN
     WHERE status = 'active'
   LOOP
     IF v_investment.last_earning_at IS NULL OR v_investment.last_earning_at < NOW() - INTERVAL '24 hours' THEN
-      v_earning_amount := v_investment.amount * (v_investment.daily_roi / 100)
+      v_earning_amount := v_investment.amount * (v_investment.daily_roi / 100);
 
       UPDATE public.profiles
       SET balance = coalesce(balance, 0) + v_earning_amount
