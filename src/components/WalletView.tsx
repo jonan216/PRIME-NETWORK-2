@@ -1,28 +1,73 @@
-import { useState } from 'react'
-import { Wallet, TrendingUp, CircleDollarSign, ArrowDownToLine, Send } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Wallet, TrendingUp, CircleDollarSign, ArrowDownToLine, Loader2 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import { supabase, mapSupabaseError } from '../lib/supabaseClient'
 import { formatDualCurrency } from '../lib/currency'
 
 interface Transaction {
   id: string
-  date: string
   type: string
   amount: number
-  status: 'Completed' | 'Pending'
+  status: string
+  provider?: string
+  created_at: string
 }
 
-const mockTransactions: Transaction[] = []
-
-const balanceCards = [
-  { label: 'Available Balance', value: 0, icon: Wallet },
-  { label: 'Invested', value: 0, icon: TrendingUp },
-  { label: 'Earnings', value: 0, icon: CircleDollarSign },
-  { label: 'Withdrawable Balance', value: 0, icon: ArrowDownToLine }
-]
+interface Investment {
+  id: string
+  plan_name: string
+  amount: number
+  daily_roi: number
+  status: string
+  created_at: string
+}
 
 export default function WalletView() {
-  const [fromAccount, setFromAccount] = useState('')
-  const [toAccount, setToAccount] = useState('')
-  const [amount, setAmount] = useState('')
+  const { profile } = useAuth()
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [investments, setInvestments] = useState<Investment[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadWalletData() {
+      if (!profile?.id) return
+      setLoading(true)
+
+      const [txRes, invRes] = await Promise.all([
+        supabase.from('transactions').select('*').eq('user_id', profile.id).order('created_at', { ascending: false }).limit(20),
+        supabase.from('investments').select('*').eq('user_id', profile.id).order('created_at', { ascending: false })
+      ])
+
+      if (txRes.error) {
+        console.error('Error loading transactions:', mapSupabaseError(txRes.error))
+      } else if (txRes.data) {
+        setTransactions(txRes.data)
+      }
+      if (invRes.error) {
+        console.error('Error loading investments:', mapSupabaseError(invRes.error))
+      } else if (invRes.data) {
+        setInvestments(invRes.data)
+      }
+      setLoading(false)
+    }
+
+    loadWalletData()
+  }, [profile?.id])
+
+  const availableBalance = profile?.balance ?? 0
+  const totalInvested = investments
+    .filter(i => i.status === 'active')
+    .reduce((sum, inv) => sum + (inv.amount || 0), 0)
+  const totalEarnings = transactions
+    .filter(t => t.type === 'earning' && t.status === 'completed')
+    .reduce((sum, t) => sum + (t.amount || 0), 0)
+
+  const stats = [
+    { label: 'Available Balance', value: formatDualCurrency(availableBalance), icon: Wallet, color: 'text-accent' },
+    { label: 'Total Invested', value: formatDualCurrency(totalInvested), icon: TrendingUp, color: 'text-text-primary' },
+    { label: 'Total Earnings', value: formatDualCurrency(totalEarnings), icon: CircleDollarSign, color: 'text-status-success' },
+    { label: 'Withdrawable Balance', value: formatDualCurrency(availableBalance), icon: ArrowDownToLine, color: 'text-status-success' }
+  ]
 
   return (
     <div className="min-h-screen bg-cream-primary">
@@ -31,13 +76,8 @@ export default function WalletView() {
           Wallet
         </h1>
 
-        <div className="bg-cream-card rounded-cream-lg border border-cream-border p-8 shadow-cream-lg mb-6">
-          <p className="text-text-secondary text-sm mb-2">Available Balance</p>
-          <p className="text-4xl md:text-5xl font-bold text-accent">{formatDualCurrency(0)}</p>
-        </div>
-
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-          {balanceCards.map((card) => {
+          {stats.map((card) => {
             const Icon = card.icon
             return (
               <div
@@ -45,11 +85,11 @@ export default function WalletView() {
                 className="bg-cream-card rounded-cream-lg border border-cream-border p-5 shadow-cream"
               >
                 <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center mb-3">
-                  <Icon size={20} className="text-accent" />
+                  <Icon size={20} className={card.color} />
                 </div>
                 <p className="text-text-secondary text-sm mb-1">{card.label}</p>
                 <p className="text-xl font-bold text-accent">
-                  {formatDualCurrency(card.value)}
+                  {card.value}
                 </p>
               </div>
             )
@@ -61,87 +101,59 @@ export default function WalletView() {
             Recent Transactions
           </h2>
           <div className="bg-cream-card rounded-cream-lg border border-cream-border shadow-cream overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-cream-border">
-                    <th className="text-left px-6 py-4 text-text-secondary text-xs font-medium uppercase tracking-wider">Date</th>
-                    <th className="text-left px-6 py-4 text-text-secondary text-xs font-medium uppercase tracking-wider">Type</th>
-                    <th className="text-left px-6 py-4 text-text-secondary text-xs font-medium uppercase tracking-wider">Amount</th>
-                    <th className="text-left px-6 py-4 text-text-secondary text-xs font-medium uppercase tracking-wider">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-cream-border">
-                  {mockTransactions.map((tx) => (
-                    <tr key={tx.id} className="hover:bg-cream-soft/30 transition-colors">
-                      <td className="px-6 py-4 text-text-primary text-sm">{tx.date}</td>
-                      <td className="px-6 py-4 text-text-primary text-sm">{tx.type}</td>
-                      <td className="px-6 py-4 text-text-primary text-sm font-medium">
-                        {formatDualCurrency(tx.amount)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${
-                            tx.status === 'Completed'
-                              ? 'text-status-success bg-status-success/10'
-                              : 'text-status-warning bg-status-warning/10'
-                          }`}
-                        >
-                          {tx.status}
-                        </span>
-                      </td>
+            {loading ? (
+              <div className="flex justify-center py-12"><Loader2 className="animate-spin text-accent" size={28} /></div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-cream-border">
+                      <th className="text-left px-6 py-4 text-text-secondary text-xs font-medium uppercase tracking-wider">Date & Time</th>
+                      <th className="text-left px-6 py-4 text-text-secondary text-xs font-medium uppercase tracking-wider">Type</th>
+                      <th className="text-left px-6 py-4 text-text-secondary text-xs font-medium uppercase tracking-wider">Provider</th>
+                      <th className="text-right px-6 py-4 text-text-secondary text-xs font-medium uppercase tracking-wider">Amount</th>
+                      <th className="text-right px-6 py-4 text-text-secondary text-xs font-medium uppercase tracking-wider">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              {mockTransactions.length === 0 && (
-                <p className="text-sm text-text-secondary text-center py-8">No wallet transactions found</p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <h2 className="text-2xl font-display font-bold text-text-primary mb-6">
-            Quick Transfer
-          </h2>
-          <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6 md:p-8 shadow-cream max-w-2xl">
-            <div className="space-y-5">
-              <div>
-                <label className="block text-text-secondary text-sm mb-2">From</label>
-                <input
-                  type="text"
-                  value={fromAccount}
-                  onChange={(e) => setFromAccount(e.target.value)}
-                  placeholder="Enter source account"
-                  className="w-full px-4 py-3 rounded-xl border border-cream-border bg-cream-secondary text-text-primary placeholder-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-colors text-sm"
-                />
+                  </thead>
+                  <tbody className="divide-y divide-cream-border">
+                    {transactions.map((tx) => (
+                      <tr key={tx.id} className="hover:bg-cream-soft/30 transition-colors">
+                        <td className="px-6 py-4 text-text-primary text-sm whitespace-nowrap">
+                          {new Date(tx.created_at).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-text-primary text-sm capitalize">
+                          {tx.type}
+                        </td>
+                        <td className="px-6 py-4 text-text-secondary text-sm">{tx.provider || '—'}</td>
+                        <td className={`px-6 py-4 text-sm font-medium text-right ${
+                          tx.type === 'deposit' || tx.type === 'earning' || tx.type === 'referral_reward'
+                            ? 'text-status-success' : 'text-text-primary'
+                        }`}>
+                          {tx.type === 'deposit' || tx.type === 'earning' || tx.type === 'referral_reward' ? '+' : '-'}
+                          {formatDualCurrency(tx.amount)}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            tx.status === 'completed' || tx.status === 'approved' ? 'bg-status-success/10 text-status-success' :
+                            tx.status === 'pending' || tx.status === 'pending_approval' ? 'bg-status-warning/10 text-status-warning' :
+                            'bg-status-error/10 text-status-error'
+                          }`}>
+                            {tx.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                    {transactions.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="py-12 text-center text-text-secondary text-sm">
+                          No wallet transactions found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-              <div>
-                <label className="block text-text-secondary text-sm mb-2">To</label>
-                <input
-                  type="text"
-                  value={toAccount}
-                  onChange={(e) => setToAccount(e.target.value)}
-                  placeholder="Enter destination account"
-                  className="w-full px-4 py-3 rounded-xl border border-cream-border bg-cream-secondary text-text-primary placeholder-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-colors text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-text-secondary text-sm mb-2">Amount</label>
-                <input
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full px-4 py-3 rounded-xl border border-cream-border bg-cream-secondary text-text-primary placeholder-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-colors text-sm"
-                />
-              </div>
-              <button className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-accent text-white font-medium hover:bg-accent-hover transition-colors">
-                <Send size={18} />
-                Send
-              </button>
-            </div>
+            )}
           </div>
         </div>
       </div>

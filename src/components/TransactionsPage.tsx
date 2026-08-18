@@ -14,7 +14,7 @@ interface Transaction {
 }
 
 export default function TransactionsPage() {
-  const { profile } = useAuth()
+  const { profile, refreshProfile } = useAuth()
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -24,6 +24,8 @@ export default function TransactionsPage() {
     async function fetchTransactions() {
       if (!profile?.id) return
       setLoading(true)
+
+      await refreshProfile()
 
       const { data, error } = await supabase
         .from('transactions')

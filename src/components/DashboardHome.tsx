@@ -22,7 +22,7 @@ interface Investment {
 }
 
 export default function DashboardHome() {
-  const { profile } = useAuth()
+  const { profile, refreshProfile } = useAuth()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [investments, setInvestments] = useState<Investment[]>([])
   const [loading, setLoading] = useState(true)
@@ -31,6 +31,8 @@ export default function DashboardHome() {
     async function loadDashboardData() {
       if (!profile?.id) return
       setLoading(true)
+
+      await refreshProfile()
 
       const [txRes, invRes] = await Promise.all([
         supabase.from('transactions').select('*').eq('user_id', profile.id).order('created_at', { ascending: false }).limit(5),
