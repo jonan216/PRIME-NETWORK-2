@@ -238,7 +238,7 @@ marzRouter.post('/sync', async (req, res) => {
           continue
         }
         const statusData = await statusRes.json()
-        const status = String(statusData.status || statusData.data?.status || '').toLowerCase()
+        const status = String(statusData.status || statusData.data?.status || statusData.transaction?.status || '').toLowerCase()
 
         if (tx.type === 'deposit') {
           if (['completed', 'success', 'paid', 'credited', 'successful'].includes(status)) {

@@ -99,6 +99,11 @@ export default function DepositPage() {
           if (['credited', 'completed', 'successful', 'paid', 'success', 'sandbox'].includes(txStatus)) {
             clearInterval(interval)
             setStatus('completed')
+            try {
+              await fetch('/api/marz/sync', { method: 'POST' })
+            } catch {
+              // sync is best-effort; webhook may still complete it
+            }
             refreshProfile()
           } else if (['failed', 'rejected', 'cancelled', 'expired'].includes(txStatus)) {
             setStatus('failed')
