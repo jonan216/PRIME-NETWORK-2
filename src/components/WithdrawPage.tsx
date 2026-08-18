@@ -1,12 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ArrowUpRight, Wallet, Building2, History, Loader2, CheckCircle2, Clock, XCircle } from 'lucide-react'
 import { initiateWithdrawal, getTransactionStatus } from '../lib/marzApi'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabaseClient'
 import { formatDualCurrency } from '../lib/currency'
 
-type PaymentStatus = 'idle' | 'pending' | 'waiting' | 'pending_approval' | 'completed' | 'failed'
+interface Transaction {
+  id: string
+  type: string
+  amount: number
+  status: string
+  provider?: string
+  created_at: string
+}
 
-interface Withdrawal {
+interface RecentWithdrawal {
   id: string
   date: string
   method: string
@@ -14,16 +22,16 @@ interface Withdrawal {
   status: 'completed' | 'pending' | 'processing'
 }
 
-const mockWithdrawals: Withdrawal[] = []
-
 export default function WithdrawPage() {
   const { user, profile, refreshProfile } = useAuth()
   const [amount, setAmount] = useState('')
   const [provider, setProvider] = useState<'mtn_momo' | 'airtel_money' | 'bank_transfer'>('mtn_momo')
   const [phone, setPhone] = useState('')
   const [details, setDetails] = useState('')
-  const [status, setStatus] = useState<PaymentStatus>('idle')
+  const [status, setStatus] = useState<'idle' | 'pending' | 'waiting' | 'pending_approval' | 'completed' | 'failed'>('idle')
   const [error, setError] = useState('')
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [loading, setLoading] = useState(true)
 
   const methods = [
     { value: 'mtn_momo', label: 'MTN Mobile Money', icon: Wallet },
@@ -31,13 +39,51 @@ export default function WithdrawPage() {
     { value: 'bank_transfer', label: 'Bank Transfer', icon: Building2 },
   ]
 
+  useEffect(() => {
+    async function loadTransactions() {
+      if (!profile?.id) return
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false })
+      if (!error && data) {
+        setTransactions(data)
+      }
+      setLoading(false)
+    }
+    loadTransactions()
+  }, [profile?.id])
+
+  const availableBalance = transactions.reduce((sum, tx) => {
+    const amt = tx.amount || 0
+    if (tx.type === 'deposit' && tx.status === 'completed') return sum + amt
+    if (tx.type === 'withdrawal' && (tx.status === 'completed' || tx.status === 'approved')) return sum - amt
+    if (tx.type === 'investment' && tx.status === 'active') return sum - amt
+    if (tx.type === 'earning' && tx.status === 'completed') return sum + amt
+    if (tx.type === 'referral_reward' && tx.status === 'completed') return sum + amt
+    if (tx.type === 'refund' && tx.status === 'completed') return sum + amt
+    return sum
+  }, 0)
+
+  const recentWithdrawals: RecentWithdrawal[] = transactions
+    .filter(tx => tx.type === 'withdrawal')
+    .slice(0, 5)
+    .map(tx => ({
+      id: tx.id,
+      date: new Date(tx.created_at).toLocaleDateString(),
+      method: tx.provider || '—',
+      amount: tx.amount,
+      status: tx.status === 'completed' || tx.status === 'approved' ? 'completed' : tx.status === 'pending' ? 'pending' : 'processing',
+    }))
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setStatus('pending')
 
     try {
-      // Auto-format phone to E.164 (+256XXXXXXXXX) before sending
       let formattedPhone = phone.replace(/\D/g, '')
       if (formattedPhone.startsWith('0') && formattedPhone.length === 10) {
         formattedPhone = '+256' + formattedPhone.slice(1)
@@ -60,6 +106,11 @@ export default function WithdrawPage() {
         return
       }
 
+      if (availableBalance < parsedAmount) {
+        setError(`Insufficient balance. You need UGX ${parsedAmount.toLocaleString()} but your available balance is UGX ${availableBalance.toLocaleString()}.`)
+        return
+      }
+
       const result = await initiateWithdrawal({
         amount: parsedAmount,
         currency: 'UGX',
@@ -71,7 +122,6 @@ export default function WithdrawPage() {
 
       setStatus('waiting')
 
-      // Trigger backend sync with Marz
       fetch('/api/marz/sync', { method: 'POST' }).catch(() => {})
 
       const interval = setInterval(async () => {
@@ -103,7 +153,7 @@ export default function WithdrawPage() {
   return (
     <div className="min-h-screen bg-cream-primary">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="font-display text-3xl font-semibold text-text-primary mb-8">Withdraw</h1>
+        <h1 className="text-3xl md:text-4xl font-display font-bold text-text-primary mb-8">Withdraw</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-cream-card rounded-cream-lg border border-cream-border p-6">
@@ -125,7 +175,7 @@ export default function WithdrawPage() {
               <>
                 <div className="mb-6">
                   <p className="text-sm text-text-secondary mb-1">Available Balance</p>
-                  <p className="text-4xl font-display font-semibold text-accent">{formatDualCurrency(profile?.balance ?? 0)}</p>
+                  <p className="text-4xl font-display font-semibold text-accent">{formatDualCurrency(availableBalance)}</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
@@ -245,24 +295,30 @@ export default function WithdrawPage() {
             </div>
 
             <div className="space-y-4">
-              {mockWithdrawals.map(w => (
-                <div key={w.id} className="flex items-center justify-between py-3 border-b border-cream-border last:border-0">
-                  <div>
-                    <p className="text-sm font-medium text-text-primary">{w.method}</p>
-                    <p className="text-xs text-text-secondary mt-0.5">{w.date}</p>
+              {loading ? (
+                <div className="flex justify-center py-4"><Loader2 className="animate-spin text-accent" size={20} /></div>
+              ) : recentWithdrawals.length === 0 ? (
+                <p className="text-sm text-text-secondary text-center py-4">No withdrawals yet</p>
+              ) : (
+                recentWithdrawals.map(w => (
+                  <div key={w.id} className="flex items-center justify-between py-3 border-b border-cream-border last:border-0">
+                    <div>
+                      <p className="text-sm font-medium text-text-primary">{w.method}</p>
+                      <p className="text-xs text-text-secondary mt-0.5">{w.date}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-text-primary">{formatDualCurrency(w.amount)}</p>
+                      <span className={`inline-block text-xs font-medium mt-0.5 ${
+                        w.status === 'completed' ? 'text-status-success' :
+                        w.status === 'pending' ? 'text-status-warning' :
+                        'text-text-secondary'
+                      }`}>
+                        {w.status.charAt(0).toUpperCase() + w.status.slice(1)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-text-primary">${w.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                    <span className={`inline-block text-xs font-medium mt-0.5 ${
-                      w.status === 'completed' ? 'text-status-success' :
-                      w.status === 'pending' ? 'text-status-warning' :
-                      'text-text-secondary'
-                    }`}>
-                      {w.status.charAt(0).toUpperCase() + w.status.slice(1)}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>

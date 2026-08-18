@@ -1,11 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ShieldCheck, Wallet, Building2, CreditCard, ArrowRight, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { initiateDeposit, getTransactionStatus } from '../lib/marzApi'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabaseClient'
 import { formatDualCurrency } from '../lib/currency'
 
 
 type PaymentStatus = 'idle' | 'pending' | 'waiting' | 'completed' | 'failed'
+
+interface Transaction {
+  id: string
+  type: string
+  amount: number
+  status: string
+  created_at: string
+}
 
 export default function DepositPage() {
   const { user, profile, refreshProfile } = useAuth()
@@ -15,6 +24,8 @@ export default function DepositPage() {
   const [note, setNote] = useState('')
   const [status, setStatus] = useState<PaymentStatus>('idle')
   const [error, setError] = useState('')
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [loadingTx, setLoadingTx] = useState(true)
 
   const providers = [
     { value: 'mtn_momo', label: 'MTN Mobile Money', icon: Wallet },
@@ -26,7 +37,33 @@ export default function DepositPage() {
 
   const selectedProvider = providers.find(p => p.value === provider)
 
+  useEffect(() => {
+    async function loadTransactions() {
+      if (!profile?.id) return
+      setLoadingTx(true)
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false })
+      if (!error && data) {
+        setTransactions(data)
+      }
+      setLoadingTx(false)
+    }
+    loadTransactions()
+  }, [profile?.id])
 
+  const availableBalance = transactions.reduce((sum, tx) => {
+    const amt = tx.amount || 0
+    if (tx.type === 'deposit' && tx.status === 'completed') return sum + amt
+    if (tx.type === 'withdrawal' && (tx.status === 'completed' || tx.status === 'approved')) return sum - amt
+    if (tx.type === 'investment' && tx.status === 'active') return sum - amt
+    if (tx.type === 'earning' && tx.status === 'completed') return sum + amt
+    if (tx.type === 'referral_reward' && tx.status === 'completed') return sum + amt
+    if (tx.type === 'refund' && tx.status === 'completed') return sum + amt
+    return sum
+  }, 0)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,7 +88,6 @@ export default function DepositPage() {
         return
       }
 
-      // Auto-format phone to E.164 (+256XXXXXXXXX) before sending
       let formattedPhone = phone.replace(/\D/g, '')
       if (formattedPhone.startsWith('0') && formattedPhone.length === 10) {
         formattedPhone = '+256' + formattedPhone.slice(1)
@@ -72,8 +108,6 @@ export default function DepositPage() {
         user_id: user.id,
       })
 
-      // USSD prompt successfully pushed to user's phone.
-      // Transition UI to 'waiting' state so user sees the PIN prompt instruction on screen.
       setStatus('waiting')
 
       const txRef = result.reference || result.data?.reference || result.data?.data?.transaction?.reference || result.transaction?.reference
@@ -82,7 +116,6 @@ export default function DepositPage() {
         return
       }
 
-      // Trigger backend sync with Marz
       fetch('/api/marz/sync', { method: 'POST' }).catch(() => {})
 
       const interval = setInterval(async () => {
@@ -114,10 +147,8 @@ export default function DepositPage() {
         }
       }, 3000)
 
-      // Keep polling up to 2 minutes for user PIN entry
       setTimeout(() => clearInterval(interval), 120000)
     } catch (err: any) {
-      // Provide friendly errors for common Marz Innovations failure reasons
       let errorMsg = err.message || 'Failed to initiate deposit'
       if (errorMsg.toLowerCase().includes('no collection services') || errorMsg.toLowerCase().includes('available for country')) {
         errorMsg = 'Mobile money collection is not yet active on this account. Please contact support or try again later.'
@@ -216,7 +247,6 @@ export default function DepositPage() {
                         type="tel"
                         value={phone}
                         onChange={e => {
-                          // Strip any non-digit characters (user can type local 9-10 digit number)
                           const raw = e.target.value.replace(/\D/g, '')
                           setPhone(raw)
                         }}
@@ -286,7 +316,7 @@ export default function DepositPage() {
 
               <div className="bg-cream-soft rounded-xl p-4 border border-cream-border mb-4">
                 <p className="text-xs font-medium text-text-secondary mb-1">Current Wallet Balance</p>
-                <p className="text-xl font-bold text-accent">{formatDualCurrency(profile?.balance ?? 0)}</p>
+                <p className="text-xl font-bold text-accent">{loadingTx ? '...' : formatDualCurrency(availableBalance)}</p>
               </div>
 
               {selectedProvider && (
