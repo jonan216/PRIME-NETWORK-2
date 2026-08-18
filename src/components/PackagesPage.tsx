@@ -119,6 +119,18 @@ export default function PackagesPage() {
           setSubmitting(false)
           return
         }
+
+        await supabase.from('transactions').insert({
+          user_id: profile.id,
+          type: 'investment',
+          amount: numAmount,
+          status: 'active',
+          provider: null,
+          reference: `INV-${data.id}`,
+        }).then(({ error: txError }) => {
+          if (txError) console.error('Investment transaction error:', txError)
+        })
+
         const { error: rpcError } = await supabase.rpc('process_referral_bonus', { p_investor_id: profile.id, p_amount: numAmount })
         if (rpcError) console.error('Referral bonus error:', mapSupabaseError(rpcError))
       } catch (err) {

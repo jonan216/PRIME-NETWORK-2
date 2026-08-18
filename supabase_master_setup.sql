@@ -248,7 +248,11 @@ BEGIN
   SELECT coalesce(sum(
     CASE
       WHEN type = 'deposit' AND status IN ('completed', 'approved') THEN amount
-      WHEN type = 'withdrawal' AND status IN ('completed', 'approved', 'pending_approval') THEN -amount
+      WHEN type = 'withdrawal' AND status IN ('completed', 'approved') THEN -amount
+      WHEN type = 'investment' AND status = 'active' THEN -amount
+      WHEN type = 'earning' AND status = 'completed' THEN amount
+      WHEN type = 'referral_reward' AND status = 'completed' THEN amount
+      WHEN type = 'refund' AND status = 'completed' THEN amount
       ELSE 0
     END
   ), 0) INTO v_new_balance
