@@ -306,4 +306,20 @@ adminRouter.post('/transactions/:id/reject', async (req, res) => {
   }
 })
 
+adminRouter.post('/cleanup/fake-packages', async (_req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin.rpc('cleanup_fake_packages')
+
+    if (error) {
+      console.error('Error cleaning up fake packages:', error)
+      return res.status(500).json({ message: 'Failed to cleanup fake packages', error: error.message })
+    }
+
+    res.json({ message: 'Fake packages cleaned up successfully', result: data })
+  } catch (err) {
+    console.error('Cleanup fake packages error:', err)
+    res.status(500).json({ message: 'Failed to cleanup fake packages' })
+  }
+})
+
 export const adminApiRouter = adminRouter

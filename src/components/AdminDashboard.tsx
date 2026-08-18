@@ -828,9 +828,21 @@ export default function AdminDashboard() {
             <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-text-primary">Investment Management</h2>
-                <button onClick={loadInvestments} className="p-2 rounded-xl bg-accent/10 hover:bg-accent/20 text-accent transition-colors">
-                  {invLoading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button onClick={loadInvestments} className="p-2 rounded-xl bg-accent/10 hover:bg-accent/20 text-accent transition-colors">
+                    {invLoading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
+                  </button>
+                  <button onClick={async () => {
+                    if (!window.confirm('Delete all packages from users who have never made a deposit? This cannot be undone.')) return
+                    const res = await fetch('/api/admin/cleanup/fake-packages', { method: 'POST', headers: { 'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}` } })
+                    const json = await res.json()
+                    alert(json.message || JSON.stringify(json))
+                    loadInvestments()
+                    loadUsers()
+                  }} className="p-2 rounded-xl bg-status-error/10 hover:bg-status-error/20 text-status-error transition-colors" title="Remove fake packages from users with no deposits">
+                    <Trash2 size={18} />
+                  </button>
+                </div>
               </div>
               {invLoading ? (
                 <div className="flex justify-center py-10"><Loader2 className="animate-spin text-accent" size={28} /></div>

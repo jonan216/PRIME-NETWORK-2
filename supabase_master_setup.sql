@@ -308,6 +308,35 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Cleanup fake packages from users who never deposited through Marz
+CREATE OR REPLACE FUNCTION public.cleanup_fake_packages()
+RETURNS TABLE(deleted_count BIGINT, user_count BIGINT) AS $$
+DECLARE
+  v_deleted_count BIGINT := 0;
+  v_user_count BIGINT := 0;
+BEGIN
+  DELETE FROM public.investments
+  WHERE user_id IN (
+    SELECT p.id
+    FROM public.profiles p
+    LEFT JOIN public.transactions t ON t.user_id = p.id AND t.type = 'deposit' AND t.status IN ('completed', 'approved')
+    WHERE t.id IS NULL
+  )
+  RETURNING COUNT(*) INTO v_deleted_count;
+
+  SELECT COUNT(DISTINCT user_id) INTO v_user_count
+  FROM public.investments
+  WHERE user_id IN (
+    SELECT p.id
+    FROM public.profiles p
+    LEFT JOIN public.transactions t ON t.user_id = p.id AND t.type = 'deposit' AND t.status IN ('completed', 'approved')
+    WHERE t.id IS NULL
+  );
+
+  RETURN QUERY SELECT v_deleted_count, v_user_count;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- ==========================================
 -- 5. CREATE TRIGGERS
 -- ==========================================
@@ -436,6 +465,7 @@ GRANT EXECUTE ON FUNCTION public.recalculate_balance(UUID) TO authenticated, ano
 GRANT EXECUTE ON FUNCTION public.refresh_marz_verified_balance(UUID) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.process_daily_earnings() TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.recalculate_all_balances() TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.cleanup_fake_packages() TO authenticated, anon;
 
 -- ==========================================
 -- 9. BACKFILL MISSING PROFILES (one-time)
