@@ -290,7 +290,7 @@ BEGIN
     IF v_investment.last_earning_at IS NULL OR v_investment.last_earning_at < NOW() - INTERVAL '24 hours' THEN
       v_earning_amount := v_investment.amount * (v_investment.daily_roi / 100)
 
-      PERFORM public.increment_balance(v_investment.user_id, v_earning_amount)
+      PERFORM public.increment_balance(v_investment.user_id, v_earning_amount);
 
       INSERT INTO public.transactions (user_id, type, amount, status, provider, reference)
       VALUES (v_investment.user_id, 'earning', v_earning_amount, 'completed', NULL, 'EARN-' || gen_random_uuid());
