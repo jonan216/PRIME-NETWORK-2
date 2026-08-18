@@ -9,22 +9,26 @@ const app = express()
 
 app.use(cors())
 
-// Capture rawBody BEFORE express.json() so the /webhook route can verify
-// HMAC-SHA256 signatures over the exact bytes Marz Innovations sent.
-app.use((req, _res, next) => {
-  let data = ''
-  req.on('data', chunk => { data += chunk })
-  req.on('end', () => {
-    req.rawBody = data
+// On server, capture rawBody using express.raw() BEFORE parsing JSON.
+// This gives the webhook route the original bytes for HMAC-SHA256 verification.
+app.use((req, res, next) => {
+  express.raw({ type: '*/*', limit: '10mb' })(req, res, (err) => {
+    if (err) return next(err)
+    if (Buffer.isBuffer(req.body)) {
+      req.rawBody = req.body.toString('utf8')
+      try {
+        req.body = JSON.parse(req.rawBody)
+      } catch {
+        req.body = {}
+      }
+    }
     next()
   })
 })
 
-app.use(express.json())
-
 app.use('/api', apiRouter)
 
-const PORT = process.env.PORT || 3001
+const PORT = process.argv[2] || process.env.PORT || 3001
 app.listen(PORT, () => {
   console.log(`Prime Network backend running on port ${PORT}`)
 })

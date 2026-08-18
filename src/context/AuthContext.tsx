@@ -53,29 +53,64 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data as Profile
   }
 
+  const syncAndReconcileDeposits = async (userId: string) => {
+    try {
+      // 1. Trigger Marz API deposit reconciliation endpoint
+      await fetch('/api/marz/reconcile-deposits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      }).catch(() => {})
+
+      // 2. Trigger database balance verification procedure
+      await supabase.rpc('refresh_marz_verified_balance', { p_user_id: userId }).catch(() => {})
+    } catch (err) {
+      console.error('[AuthContext] syncAndReconcileDeposits error:', err)
+    }
+  }
+
   const refreshProfile = async () => {
     if (user) {
-      try {
-        await supabase.rpc('refresh_marz_verified_balance', { p_user_id: user.id })
-      } catch (err) {
-        console.error('Balance verification error:', err)
-      }
+      await syncAndReconcileDeposits(user.id)
       const p = await fetchProfile(user.id)
       setProfile(p)
     }
   }
 
   useEffect(() => {
+    let realtimeChannel: any = null
+
+    const setupRealtime = (userId: string) => {
+      if (realtimeChannel) {
+        supabase.removeChannel(realtimeChannel)
+      }
+      realtimeChannel = supabase
+        .channel(`user-sync-${userId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${userId}` },
+          async () => {
+            await refreshProfile()
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
+          async () => {
+            const p = await fetchProfile(userId)
+            if (p) setProfile(p)
+          }
+        )
+        .subscribe()
+    }
+
     // Get initial session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
-        try {
-          await supabase.rpc('refresh_marz_verified_balance', { p_user_id: session.user.id })
-        } catch (err) {
-          console.error('Balance verification error:', err)
-        }
+        setupRealtime(session.user.id)
+        await syncAndReconcileDeposits(session.user.id)
         const p = await fetchProfile(session.user.id)
         setProfile(p)
       }
@@ -87,20 +122,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
-        try {
-          await supabase.rpc('refresh_marz_verified_balance', { p_user_id: session.user.id })
-        } catch (err) {
-          console.error('Balance verification error:', err)
-        }
+        setupRealtime(session.user.id)
+        await syncAndReconcileDeposits(session.user.id)
         const p = await fetchProfile(session.user.id)
         setProfile(p)
       } else {
+        if (realtimeChannel) {
+          supabase.removeChannel(realtimeChannel)
+          realtimeChannel = null
+        }
         setProfile(null)
       }
     })
 
-    return () => subscription.unsubscribe()
-  }, [])
+    return () => {
+      subscription.unsubscribe()
+      if (realtimeChannel) {
+        supabase.removeChannel(realtimeChannel)
+      }
+    }
+  }, [user?.id])
 
   const login = async (identifier: string, password: string): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true)

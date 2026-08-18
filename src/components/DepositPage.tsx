@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ShieldCheck, Wallet, Building2, CreditCard, ArrowRight, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { initiateDeposit, getTransactionStatus } from '../lib/marzApi'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import { formatDualCurrency } from '../lib/currency'
-
 
 type PaymentStatus = 'idle' | 'pending' | 'waiting' | 'completed' | 'failed'
 
@@ -37,24 +36,25 @@ export default function DepositPage() {
 
   const selectedProvider = providers.find(p => p.value === provider)
 
-  useEffect(() => {
-    async function loadTransactions() {
-      if (!profile?.id) return
-      setLoadingTx(true)
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('user_id', profile.id)
-        .order('created_at', { ascending: false })
-      if (!error && data) {
-        setTransactions(data)
-      }
-      setLoadingTx(false)
+  const loadTransactions = useCallback(async () => {
+    if (!profile?.id) return
+    setLoadingTx(true)
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', profile.id)
+      .order('created_at', { ascending: false })
+    if (!error && data) {
+      setTransactions(data)
     }
-    loadTransactions()
+    setLoadingTx(false)
   }, [profile?.id])
 
-  const availableBalance = transactions.reduce((sum, tx) => {
+  useEffect(() => {
+    loadTransactions()
+  }, [loadTransactions, profile?.balance])
+
+  const calculatedBalance = transactions.reduce((sum, tx) => {
     const amt = tx.amount || 0
     if (tx.type === 'deposit' && (tx.status === 'completed' || tx.status === 'approved')) return sum + amt
     if (tx.type === 'withdrawal' && (tx.status === 'completed' || tx.status === 'approved')) return sum - amt
@@ -64,6 +64,11 @@ export default function DepositPage() {
     if (tx.type === 'refund' && tx.status === 'completed') return sum + amt
     return sum
   }, 0)
+
+  // Use verified profile balance from Supabase if present, or fallback to calculated balance
+  const availableBalance = profile?.balance !== undefined && profile.balance !== null 
+    ? Math.max(Number(profile.balance), calculatedBalance)
+    : calculatedBalance
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -137,7 +142,8 @@ export default function DepositPage() {
             } catch {
               // sync is best-effort; webhook may still complete it
             }
-            refreshProfile()
+            await refreshProfile()
+            await loadTransactions()
           } else if (['failed', 'rejected', 'cancelled', 'expired'].includes(txStatus)) {
             setStatus('failed')
             clearInterval(interval)
@@ -173,9 +179,9 @@ export default function DepositPage() {
                   <CheckCircle2 size={32} className="text-status-success" />
                 </div>
                 <h3 className="text-xl font-semibold text-text-primary mb-2">Payment Confirmed!</h3>
-                <p className="text-text-secondary mb-6">Your wallet has been updated.</p>
+                <p className="text-text-secondary mb-6">Your wallet balance has been updated instantly.</p>
                 <button
-                  onClick={() => { setStatus('idle'); setAmount(''); setPhone('') }}
+                  onClick={() => { setStatus('idle'); setAmount(''); setPhone(''); loadTransactions(); refreshProfile(); }}
                   className="px-6 py-3 bg-accent hover:bg-accent-hover text-white rounded-xl font-medium transition-colors"
                 >
                   Make Another Deposit

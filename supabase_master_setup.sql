@@ -64,7 +64,7 @@ CREATE TABLE public.transactions (
   user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   type TEXT NOT NULL CHECK (type IN ('deposit', 'withdrawal', 'investment', 'earning', 'referral_reward')),
   amount NUMERIC NOT NULL,
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'pending_approval', 'approved', 'rejected', 'completed')),
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'pending_approval', 'approved', 'rejected', 'completed', 'credited', 'successful', 'success', 'paid', 'sandbox')),
   provider TEXT DEFAULT NULL,
   reference TEXT DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT now()
@@ -199,7 +199,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Recalculate single user balance from transactions
+-- Recalculate single user balance from transactions (supports all success aliases)
 CREATE OR REPLACE FUNCTION public.recalculate_balance(p_user_id UUID)
 RETURNS NUMERIC AS $$
 DECLARE
@@ -207,12 +207,12 @@ DECLARE
 BEGIN
   SELECT coalesce(sum(
     CASE
-      WHEN type = 'deposit' AND status IN ('completed', 'approved') THEN amount
-      WHEN type = 'withdrawal' AND status IN ('completed', 'approved', 'pending_approval') THEN -amount
+      WHEN type = 'deposit' AND status IN ('completed', 'approved', 'credited', 'successful', 'success', 'paid', 'sandbox') THEN amount
+      WHEN type = 'withdrawal' AND status IN ('completed', 'approved') THEN -amount
       WHEN type = 'investment' AND status = 'active' THEN -amount
-      WHEN type = 'earning' AND status = 'completed' THEN amount
-      WHEN type = 'referral_reward' AND status = 'completed' THEN amount
-      WHEN type = 'refund' AND status = 'completed' THEN amount
+      WHEN type = 'earning' AND status IN ('completed', 'approved') THEN amount
+      WHEN type = 'referral_reward' AND status IN ('completed', 'approved') THEN amount
+      WHEN type = 'refund' AND status IN ('completed', 'approved') THEN amount
       ELSE 0
     END
   ), 0) INTO v_new_balance
@@ -220,52 +220,20 @@ BEGIN
   WHERE user_id = p_user_id;
 
   UPDATE public.profiles
-  SET balance = v_new_balance
+  SET balance = GREATEST(0, v_new_balance)
   WHERE id = p_user_id;
 
   RETURN v_new_balance;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Refresh balance based ONLY on verified Marz Pay deposits and withdrawals.
--- If a user has never made a deposit through the system, their balance is forced to 0.
+-- Refresh balance based on all valid verified transactions (deposit, earning, referral rewards)
 CREATE OR REPLACE FUNCTION public.refresh_marz_verified_balance(p_user_id UUID)
 RETURNS VOID AS $$
 DECLARE
-  v_has_deposits BOOLEAN;
   v_new_balance NUMERIC := 0;
 BEGIN
-  SELECT EXISTS (
-    SELECT 1 FROM public.transactions
-    WHERE user_id = p_user_id
-      AND type = 'deposit'
-      AND status IN ('completed', 'approved')
-  ) INTO v_has_deposits;
-
-  IF NOT v_has_deposits THEN
-    UPDATE public.profiles
-    SET balance = 0
-    WHERE id = p_user_id;
-    RETURN;
-  END IF;
-
-  SELECT coalesce(sum(
-    CASE
-      WHEN type = 'deposit' AND status IN ('completed', 'approved') THEN amount
-      WHEN type = 'withdrawal' AND status IN ('completed', 'approved') THEN -amount
-      WHEN type = 'investment' AND status = 'active' THEN -amount
-      WHEN type = 'earning' AND status = 'completed' THEN amount
-      WHEN type = 'referral_reward' AND status = 'completed' THEN amount
-      WHEN type = 'refund' AND status = 'completed' THEN amount
-      ELSE 0
-    END
-  ), 0) INTO v_new_balance
-  FROM public.transactions
-  WHERE user_id = p_user_id;
-
-  UPDATE public.profiles
-  SET balance = v_new_balance
-  WHERE id = p_user_id;
+  v_new_balance := public.recalculate_balance(p_user_id);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -312,8 +280,10 @@ DECLARE
   r RECORD;
 BEGIN
   FOR r IN SELECT id, balance FROM public.profiles LOOP
-    RETURN QUERY
-    SELECT r.id, r.balance, public.refresh_marz_verified_balance(r.id);
+    user_id := r.id;
+    old_balance := r.balance;
+    new_balance := public.recalculate_balance(r.id);
+    RETURN NEXT;
   END LOOP;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -324,13 +294,12 @@ RETURNS TABLE(deleted_count BIGINT, user_count BIGINT) AS $$
 DECLARE
   v_deleted_count BIGINT := 0;
   v_user_count BIGINT := 0;
-  v_temp_count BIGINT := 0;
 BEGIN
   DELETE FROM public.investments
   WHERE user_id IN (
     SELECT p.id
     FROM public.profiles p
-    LEFT JOIN public.transactions t ON t.user_id = p.id AND t.type = 'deposit' AND t.status IN ('completed', 'approved')
+    LEFT JOIN public.transactions t ON t.user_id = p.id AND t.type = 'deposit' AND t.status IN ('completed', 'approved', 'credited', 'successful', 'success', 'paid', 'sandbox')
     WHERE t.id IS NULL
   );
 
@@ -341,7 +310,7 @@ BEGIN
   WHERE user_id IN (
     SELECT p.id
     FROM public.profiles p
-    LEFT JOIN public.transactions t ON t.user_id = p.id AND t.type = 'deposit' AND t.status IN ('completed', 'approved')
+    LEFT JOIN public.transactions t ON t.user_id = p.id AND t.type = 'deposit' AND t.status IN ('completed', 'approved', 'credited', 'successful', 'success', 'paid', 'sandbox')
     WHERE t.id IS NULL
   );
 
@@ -421,28 +390,8 @@ CREATE TRIGGER set_referral_code
 CREATE OR REPLACE FUNCTION public.handle_transaction_approval()
 RETURNS TRIGGER AS $$
 BEGIN
-  IF NEW.status = 'approved' AND OLD.status <> 'approved' THEN
-    IF NEW.type = 'deposit' THEN
-      UPDATE public.profiles
-      SET balance = coalesce(balance, 0) + (NEW.amount || 0)
-      WHERE id = NEW.user_id;
-    ELSIF NEW.type = 'withdrawal' THEN
-      UPDATE public.profiles
-      SET balance = coalesce(balance, 0) - (NEW.amount || 0)
-      WHERE id = NEW.user_id;
-    ELSIF NEW.type = 'investment' THEN
-      UPDATE public.profiles
-      SET balance = coalesce(balance, 0) - (NEW.amount || 0)
-      WHERE id = NEW.user_id;
-    ELSIF NEW.type = 'earning' THEN
-      UPDATE public.profiles
-      SET balance = coalesce(balance, 0) + (NEW.amount || 0)
-      WHERE id = NEW.user_id;
-    ELSIF NEW.type = 'referral_reward' THEN
-      UPDATE public.profiles
-      SET balance = coalesce(balance, 0) + (NEW.amount || 0)
-      WHERE id = NEW.user_id;
-    END IF;
+  IF (NEW.status = 'approved' OR NEW.status = 'completed') AND OLD.status <> 'approved' AND OLD.status <> 'completed' THEN
+    PERFORM public.recalculate_balance(NEW.user_id);
   END IF;
   RETURN NEW;
 END;
@@ -515,7 +464,7 @@ GRANT EXECUTE ON FUNCTION public.recalculate_all_balances() TO authenticated, an
 GRANT EXECUTE ON FUNCTION public.cleanup_fake_packages() TO authenticated, anon;
 
 -- ==========================================
--- 9. BACKFILL MISSING PROFILES (one-time)
+-- 9. BACKFILL MISSING PROFILES & RECALCULATE ALL BALANCES (one-time)
 -- ==========================================
 
 INSERT INTO public.profiles (
@@ -537,6 +486,9 @@ LEFT JOIN public.profiles p ON p.id = u.id
 WHERE p.id IS NULL
   AND u.email IS NOT NULL
   AND u.email != '';
+
+-- Perform complete balance recalculation across all existing profiles
+SELECT public.recalculate_all_balances();
 
 -- ==========================================
 -- 10. VERIFICATION
