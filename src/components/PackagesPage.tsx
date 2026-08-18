@@ -13,11 +13,20 @@ interface Package {
   created_at: string
 }
 
+interface Transaction {
+  id: string
+  type: string
+  amount: number
+  status: string
+  created_at: string
+}
+
 export default function PackagesPage() {
   const { profile, refreshProfile } = useAuth()
   const [showAddForm, setShowAddForm] = useState(false)
   const [amount, setAmount] = useState('')
   const [packages, setPackages] = useState<Package[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -27,22 +36,37 @@ export default function PackagesPage() {
       if (!profile?.id) return
       setLoading(true)
 
-      const { data, error } = await supabase
-        .from('investments')
-        .select('*')
-        .eq('user_id', profile.id)
-        .order('created_at', { ascending: false })
+      const [invRes, txRes] = await Promise.all([
+        supabase.from('investments').select('*').eq('user_id', profile.id).order('created_at', { ascending: false }),
+        supabase.from('transactions').select('*').eq('user_id', profile.id).order('created_at', { ascending: false })
+      ])
 
-      if (!error && data) {
-        setPackages(data)
-      } else if (error) {
-        console.error('Error loading packages:', mapSupabaseError(error))
+      if (invRes.error) {
+        console.error('Error loading packages:', mapSupabaseError(invRes.error))
+      } else if (invRes.data) {
+        setPackages(invRes.data)
+      }
+      if (txRes.error) {
+        console.error('Error loading transactions:', mapSupabaseError(txRes.error))
+      } else if (txRes.data) {
+        setTransactions(txRes.data)
       }
       setLoading(false)
     }
 
     loadPackages()
   }, [profile?.id])
+
+  const availableBalance = transactions.reduce((sum, tx) => {
+    const amount = tx.amount || 0
+    if (tx.type === 'deposit' && tx.status === 'completed') return sum + amount
+    if (tx.type === 'withdrawal' && (tx.status === 'completed' || tx.status === 'approved')) return sum - amount
+    if (tx.type === 'investment' && tx.status === 'active') return sum - amount
+    if (tx.type === 'earning' && tx.status === 'completed') return sum + amount
+    if (tx.type === 'referral_reward' && tx.status === 'completed') return sum + amount
+    if (tx.type === 'refund' && tx.status === 'completed') return sum + amount
+    return sum
+  }, 0)
 
   const totalInvested = packages.reduce((sum, p) => sum + (p.amount || 0), 0)
   const activeCount = packages.filter(p => p.status === 'active').length
@@ -61,8 +85,8 @@ export default function PackagesPage() {
       return
     }
 
-    if ((profile?.balance ?? 0) < numAmount) {
-      setError(`Insufficient balance. You need UGX ${numAmount.toLocaleString()} but your available balance is UGX ${(profile?.balance ?? 0).toLocaleString()}.`)
+    if (availableBalance < numAmount) {
+      setError(`Insufficient balance. You need UGX ${numAmount.toLocaleString()} but your available balance is UGX ${availableBalance.toLocaleString()}.`)
       return
     }
 
@@ -155,6 +179,10 @@ export default function PackagesPage() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
+          <p className="text-sm text-text-secondary mb-1">Available Balance</p>
+          <p className="text-2xl font-display font-bold text-text-primary">{formatDualCurrency(availableBalance)}</p>
+        </div>
         <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
           <p className="text-sm text-text-secondary mb-1">Total Invested</p>
           <p className="text-2xl font-display font-bold text-text-primary">{formatDualCurrency(totalInvested)}</p>
