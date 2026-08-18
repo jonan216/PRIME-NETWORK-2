@@ -314,6 +314,7 @@ RETURNS TABLE(deleted_count BIGINT, user_count BIGINT) AS $$
 DECLARE
   v_deleted_count BIGINT := 0;
   v_user_count BIGINT := 0;
+  v_temp_count BIGINT := 0;
 BEGIN
   DELETE FROM public.investments
   WHERE user_id IN (
@@ -321,8 +322,9 @@ BEGIN
     FROM public.profiles p
     LEFT JOIN public.transactions t ON t.user_id = p.id AND t.type = 'deposit' AND t.status IN ('completed', 'approved')
     WHERE t.id IS NULL
-  )
-  RETURNING COUNT(*) INTO v_deleted_count;
+  );
+
+  GET DIAGNOSTICS v_deleted_count = ROW_COUNT;
 
   SELECT COUNT(DISTINCT user_id) INTO v_user_count
   FROM public.investments

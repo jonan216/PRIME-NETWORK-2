@@ -322,4 +322,64 @@ adminRouter.post('/cleanup/fake-packages', async (_req, res) => {
   }
 })
 
+adminRouter.post('/cleanup/reset-all', async (_req, res) => {
+  try {
+    const { data: investmentData } = await supabaseAdmin
+      .from('investments')
+      .select('id, user_id, amount, status')
+      .eq('status', 'active')
+
+    let refunded = 0
+    for (const inv of investmentData || []) {
+      await supabaseAdmin.rpc('increment_balance', { p_user_id: inv.user_id, p_amount: inv.amount }).catch(err => console.error('Refund error:', err))
+      await supabaseAdmin.from('transactions').insert({
+        user_id: inv.user_id,
+        type: 'refund',
+        amount: inv.amount,
+        status: 'completed',
+        provider: null,
+        reference: `RESET-ALL-${inv.id}`,
+      }).catch(err => console.error('Refund tx error:', err))
+      await supabaseAdmin.from('investments').update({ status: 'cancelled' }).eq('id', inv.id).catch(err => console.error('Cancel error:', err))
+      refunded++
+    }
+
+    const { data: fakeUsers } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .not('id', 'in', `(SELECT user_id FROM transactions WHERE type = 'deposit' AND status IN ('completed', 'approved'))`)
+
+    if (fakeUsers && fakeUsers.length > 0) {
+      await supabaseAdmin.from('investments').delete().in('user_id', fakeUsers.map(u => u.id)).catch(err => console.error('Delete fake packages error:', err))
+    }
+
+    const recalcResults = []
+    const { data: allProfiles } = await supabaseAdmin.from('profiles').select('id, balance')
+    for (const p of allProfiles || []) {
+      const { data: txData } = await supabaseAdmin
+        .from('transactions')
+        .select('type, amount, status')
+        .eq('user_id', p.id)
+
+      const newBalance = (txData || []).reduce((sum, t) => {
+        if (t.type === 'deposit' && (t.status === 'completed' || t.status === 'approved')) return sum + (t.amount || 0)
+        if (t.type === 'withdrawal' && (t.status === 'completed' || t.status === 'approved')) return sum - (t.amount || 0)
+        return sum
+      }, 0)
+
+      await supabaseAdmin.from('profiles').update({ balance: newBalance }).eq('id', p.id).catch(err => console.error('Balance update error:', err))
+      recalcResults.push({ user_id: p.id, old_balance: p.balance, new_balance: newBalance })
+    }
+
+    res.json({
+      message: 'All investments cancelled, balances refunded, and fake packages removed',
+      refunded,
+      recalc: recalcResults,
+    })
+  } catch (err) {
+    console.error('Reset all error:', err)
+    res.status(500).json({ message: 'Failed to reset all investments' })
+  }
+})
+
 export const adminApiRouter = adminRouter

@@ -56,7 +56,9 @@ export default function DashboardHome() {
   }, [profile?.id])
 
   const availableBalance = profile?.balance ?? 0
-  const totalInvested = investments.reduce((sum, inv) => sum + (inv.amount || 0), 0)
+  const totalInvested = investments
+    .filter(i => i.status === 'active')
+    .reduce((sum, inv) => sum + (inv.amount || 0), 0)
 
   const stats = [
     { label: 'Available Balance', value: formatDualCurrency(availableBalance), icon: Wallet, color: 'text-accent' },

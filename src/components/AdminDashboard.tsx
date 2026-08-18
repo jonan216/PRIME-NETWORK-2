@@ -833,13 +833,21 @@ export default function AdminDashboard() {
                     {invLoading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
                   </button>
                   <button onClick={async () => {
-                    if (!window.confirm('Delete all packages from users who have never made a deposit? This cannot be undone.')) return
-                    const res = await fetch('/api/admin/cleanup/fake-packages', { method: 'POST', headers: { 'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}` } })
+                    if (!window.confirm('CANCEL ALL investments, refund users, remove fake packages, and reset balances? This will set Total Invested to 0.')) return
+                    const token = (await supabase.auth.getSession()).data.session?.access_token
+                    const res = await fetch('/api/admin/cleanup/reset-all', {
+                      method: 'POST',
+                      headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                      },
+                    })
                     const json = await res.json()
                     alert(json.message || JSON.stringify(json))
                     loadInvestments()
                     loadUsers()
-                  }} className="p-2 rounded-xl bg-status-error/10 hover:bg-status-error/20 text-status-error transition-colors" title="Remove fake packages from users with no deposits">
+                    loadTransactions()
+                  }} className="p-2 rounded-xl bg-status-error/10 hover:bg-status-error/20 text-status-error transition-colors" title="Cancel all investments and reset to clean state">
                     <Trash2 size={18} />
                   </button>
                 </div>
