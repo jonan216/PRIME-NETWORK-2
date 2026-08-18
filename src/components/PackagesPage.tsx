@@ -85,15 +85,13 @@ export default function PackagesPage() {
 
     if (data) {
       setPackages(prev => [data, ...prev])
-      ;(async () => {
-        try {
-          await supabase.rpc('increment_balance', { p_user_id: profile.id, p_amount: -numAmount })
-          const { error: rpcError } = await supabase.rpc('process_referral_bonus', { p_investor_id: profile.id, p_amount: numAmount })
-          if (rpcError) console.error('Referral bonus error:', mapSupabaseError(rpcError))
-        } catch (err) {
-          console.error('Balance deduction error:', err as any)
-        }
-      })()
+      try {
+        await supabase.rpc('increment_balance', { p_user_id: profile.id, p_amount: -numAmount })
+        const { error: rpcError } = await supabase.rpc('process_referral_bonus', { p_investor_id: profile.id, p_amount: numAmount })
+        if (rpcError) console.error('Referral bonus error:', mapSupabaseError(rpcError))
+      } catch (err) {
+        console.error('Balance deduction error:', err as any)
+      }
       refreshProfile()
     }
 
