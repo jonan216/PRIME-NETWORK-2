@@ -58,18 +58,87 @@ export default function AdminDashboard() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [notification, setNotification] = useState<string | null>(null)
 
+  const [depositFilter, setDepositFilter] = useState<'all' | 'completed' | 'pending' | 'rejected'>('all')
+
   // ─── Data loaders ─────────────────────────────────────────────
   const loadUsers = useCallback(async () => {
     setUsersLoading(true)
-    const { data, error } = await supabase
+    
+    // 1. Try get_admin_users_summary RPC first
+    const { data: rpcData, error: rpcErr } = await supabase.rpc('get_admin_users_summary')
+
+    if (!rpcErr && rpcData) {
+      const mapped = rpcData.map((u: any) => ({
+        id: u.id,
+        full_name: u.full_name,
+        username: u.username,
+        email: u.email,
+        role: u.role,
+        status: u.status,
+        balance: Number(u.balance || 0),
+        kyc_verified: u.kyc_verified,
+        created_at: u.created_at,
+        referral_code: u.referral_code,
+        referred_by: u.referred_by,
+        totalDeposits: Number(u.total_deposits || 0),
+        totalWithdrawals: Number(u.total_withdrawals || 0),
+        totalEarnings: Number(u.total_earnings || 0),
+        totalInvestments: Number(u.total_investments || 0),
+        activeInvestmentAmount: Number(u.active_investments || 0),
+      }))
+      setUsers(mapped)
+      setUsersLoading(false)
+      return
+    }
+
+    // 2. Fallback: Query profiles + calculate aggregates dynamically
+    const { data: profiles, error } = await supabase
       .from('profiles')
       .select('*')
       .order('created_at', { ascending: false })
+
     if (error) {
       console.error('Error loading users:', mapSupabaseError(error))
-    } else if (data) {
-      setUsers(data as Profile[])
+      setUsersLoading(false)
+      return
     }
+
+    const { data: allTx } = await supabase.from('transactions').select('*')
+    const { data: allInv } = await supabase.from('investments').select('*')
+
+    const successStatuses = ['completed', 'approved', 'credited', 'successful', 'success', 'paid', 'sandbox']
+
+    const mappedUsers = (profiles as Profile[]).map(u => {
+      const uTxs = (allTx || []).filter(t => t.user_id === u.id)
+      const uInvs = (allInv || []).filter(i => i.user_id === u.id)
+
+      const totalDep = uTxs
+        .filter(t => t.type === 'deposit' && successStatuses.includes(t.status))
+        .reduce((sum, t) => sum + Number(t.amount || 0), 0)
+
+      const totalWith = uTxs
+        .filter(t => t.type === 'withdrawal' && ['completed', 'approved'].includes(t.status))
+        .reduce((sum, t) => sum + Number(t.amount || 0), 0)
+
+      const totalEarn = uTxs
+        .filter(t => ['earning', 'referral_reward', 'bonus'].includes(t.type) && ['completed', 'approved'].includes(t.status))
+        .reduce((sum, t) => sum + Number(t.amount || 0), 0)
+
+      const activeInv = uInvs
+        .filter(i => i.status === 'active')
+        .reduce((sum, i) => sum + Number(i.amount || 0), 0)
+
+      return {
+        ...u,
+        balance: Number(u.balance || 0),
+        totalDeposits: totalDep,
+        totalWithdrawals: totalWith,
+        totalEarnings: totalEarn,
+        activeInvestmentAmount: activeInv
+      }
+    })
+
+    setUsers(mappedUsers)
     setUsersLoading(false)
   }, [])
 
@@ -431,43 +500,50 @@ export default function AdminDashboard() {
         )}
 
         {/* ── OVERVIEW ── */}
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
-                <p className="text-sm text-text-secondary mb-1">Total Users</p>
-                <p className="text-3xl font-display font-semibold text-text-primary">{nonAdminUsers.length}</p>
-                <p className="text-xs text-text-secondary mt-1">{activeUsers} active</p>
-              </div>
-              <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
-                <p className="text-sm text-text-secondary mb-1">Combined Balance</p>
-                <p className="text-3xl font-display font-semibold text-accent">
-                  {formatDualCurrency(totalBalance)}
-                </p>
-              </div>
-              <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
-                <p className="text-sm text-text-secondary mb-1">Total Transactions</p>
-                <p className="text-3xl font-display font-semibold text-text-primary">{transactions.length}</p>
-              </div>
-              <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
-                <p className="text-sm text-text-secondary mb-1">Pending Actions</p>
-                <p className="text-3xl font-display font-semibold text-status-warning">{pendingTx}</p>
-                <p className="text-xs text-text-secondary mt-1">transactions awaiting review</p>
-              </div>
-              <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6 flex flex-col justify-between">
-                <div>
-                  <p className="text-sm text-text-secondary mb-1">Balance Reconciliation</p>
-                  <p className="text-xs text-text-secondary mt-1">Recalculate all user balances from transaction history</p>
+        {activeTab === 'overview' && (() => {
+          const totalCompletedDepositsSum = transactions
+            .filter(t => t.type === 'deposit' && ['completed', 'approved', 'credited', 'successful', 'success', 'paid', 'sandbox'].includes(t.status))
+            .reduce((s, t) => s + (t.amount || 0), 0)
+
+          return (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
+                  <p className="text-sm text-text-secondary mb-1">Total Users</p>
+                  <p className="text-3xl font-display font-semibold text-text-primary">{nonAdminUsers.length}</p>
+                  <p className="text-xs text-text-secondary mt-1">{activeUsers} active</p>
                 </div>
-                <button
-                  onClick={reconcileAllBalances}
-                  className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-xl text-sm font-medium transition-colors"
-                >
-                  <RefreshCw size={16} />
-                  Reconcile All Balances
-                </button>
+                <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
+                  <p className="text-sm text-text-secondary mb-1">Combined Balance</p>
+                  <p className="text-3xl font-display font-semibold text-accent">
+                    {formatDualCurrency(totalBalance)}
+                  </p>
+                </div>
+                <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
+                  <p className="text-sm text-text-secondary mb-1">Total Completed Deposits</p>
+                  <p className="text-3xl font-display font-semibold text-status-success">
+                    {formatDualCurrency(totalCompletedDepositsSum)}
+                  </p>
+                </div>
+                <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
+                  <p className="text-sm text-text-secondary mb-1">Pending Actions</p>
+                  <p className="text-3xl font-display font-semibold text-status-warning">{pendingTx}</p>
+                  <p className="text-xs text-text-secondary mt-1">transactions awaiting review</p>
+                </div>
+                <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6 flex flex-col justify-between">
+                  <div>
+                    <p className="text-sm text-text-secondary mb-1">Balance Reconciliation</p>
+                    <p className="text-xs text-text-secondary mt-1">Recalculate all user balances from transaction history</p>
+                  </div>
+                  <button
+                    onClick={reconcileAllBalances}
+                    className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-xl text-sm font-medium transition-colors"
+                  >
+                    <RefreshCw size={16} />
+                    Reconcile All Balances
+                  </button>
+                </div>
               </div>
-            </div>
 
             {pendingDeposits.length > 0 && (
               <div className="bg-cream-card rounded-cream-lg border border-status-warning/30 p-6">
@@ -569,7 +645,7 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
-        )}
+        )})()}
 
         {/* ── USERS ── */}
         {activeTab === 'users' && (
@@ -758,59 +834,141 @@ export default function AdminDashboard() {
         )}
 
         {/* ── DEPOSITS ── */}
-        {activeTab === 'deposits' && (
-          <div className="space-y-6">
-            <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-text-primary">Deposits</h2>
-                <div className="flex items-center gap-2">
-                  <button onClick={syncPendingDeposits} className="p-2 rounded-xl bg-accent/10 hover:bg-accent/20 text-accent transition-colors" title="Sync pending deposits with Marz">
-                    {txLoading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
-                  </button>
-                  <button onClick={loadTransactions} className="p-2 rounded-xl bg-accent/10 hover:bg-accent/20 text-accent transition-colors" title="Refresh">
-                    <RefreshCw size={18} />
-                  </button>
+        {activeTab === 'deposits' && (() => {
+          const allDeposits = transactions.filter(t => t.type === 'deposit')
+          const completedDeps = allDeposits.filter(t => ['completed', 'approved', 'credited', 'successful', 'success', 'paid', 'sandbox'].includes(t.status))
+          const pendingDeps = allDeposits.filter(t => ['pending', 'pending_approval'].includes(t.status))
+          const rejectedDeps = allDeposits.filter(t => t.status === 'rejected')
+
+          const totalCompletedVol = completedDeps.reduce((sum, t) => sum + Number(t.amount || 0), 0)
+
+          const displayedDeposits = depositFilter === 'completed' ? completedDeps :
+                                    depositFilter === 'pending' ? pendingDeps :
+                                    depositFilter === 'rejected' ? rejectedDeps : allDeposits
+
+          return (
+            <div className="space-y-6">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-cream-card rounded-cream-lg border border-cream-border p-5">
+                  <p className="text-sm text-text-secondary mb-1">Total Completed Deposits</p>
+                  <p className="text-2xl font-display font-semibold text-status-success">
+                    {formatDualCurrency(totalCompletedVol)}
+                  </p>
+                  <p className="text-xs text-text-secondary mt-1">{completedDeps.length} successful transactions</p>
+                </div>
+                <div className="bg-cream-card rounded-cream-lg border border-cream-border p-5">
+                  <p className="text-sm text-text-secondary mb-1">Completed Deposits Count</p>
+                  <p className="text-2xl font-display font-semibold text-text-primary">
+                    {completedDeps.length}
+                  </p>
+                  <p className="text-xs text-text-secondary mt-1">out of {allDeposits.length} total deposit requests</p>
+                </div>
+                <div className="bg-cream-card rounded-cream-lg border border-cream-border p-5">
+                  <p className="text-sm text-text-secondary mb-1">Pending Approval</p>
+                  <p className="text-2xl font-display font-semibold text-status-warning">
+                    {pendingDeps.length}
+                  </p>
+                  <p className="text-xs text-text-secondary mt-1">awaiting confirmation</p>
                 </div>
               </div>
-              {txLoading ? (
-                <div className="flex justify-center py-10"><Loader2 className="animate-spin text-accent" size={28} /></div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-cream-border">
-                        {['User', 'Amount', 'Provider', 'Reference', 'Date', 'Status'].map(h => (
-                          <th key={h} className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3 pr-4">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-cream-border">
-                      {pendingDeposits.map(tx => (
-                        <tr key={tx.id}>
-                          <td className="py-4 text-sm font-medium text-text-primary pr-4 whitespace-nowrap">
-                            {tx.profiles?.full_name || tx.profiles?.email || '—'}
-                          </td>
-                          <td className="py-4 text-sm text-text-primary pr-4">{formatDualCurrency(tx.amount)}</td>
-                          <td className="py-4 text-sm text-text-secondary pr-4">{tx.provider || '—'}</td>
-                          <td className="py-4 text-sm text-text-secondary pr-4 whitespace-nowrap font-mono text-xs">
-                            {tx.reference || '—'}
-                          </td>
-                          <td className="py-4 text-sm text-text-secondary pr-4 whitespace-nowrap">
-                            {new Date(tx.created_at).toLocaleDateString()}
-                          </td>
-                          <td className="py-4 pr-4"><StatusBadge status={tx.status} /></td>
-                        </tr>
-                      ))}
-                      {pendingDeposits.length === 0 && (
-                        <tr><td colSpan={6} className="py-10 text-center text-sm text-text-secondary">No deposits in the system yet</td></tr>
-                      )}
-                    </tbody>
-                  </table>
+
+              <div className="bg-cream-card rounded-cream-lg border border-cream-border p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-text-primary">Deposit Transactions</h2>
+                    <p className="text-xs text-text-secondary">View and audit all user deposit history</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={syncPendingDeposits} className="px-3 py-2 rounded-xl bg-accent/10 hover:bg-accent/20 text-accent text-xs font-medium transition-colors flex items-center gap-1.5" title="Sync pending deposits with Marz">
+                      {txLoading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                      Sync Pending
+                    </button>
+                    <button onClick={loadTransactions} className="p-2 rounded-xl bg-accent/10 hover:bg-accent/20 text-accent transition-colors" title="Refresh">
+                      <RefreshCw size={18} />
+                    </button>
+                  </div>
                 </div>
-              )}
+
+                {/* Sub-tab Filter Bar */}
+                <div className="flex items-center gap-2 mb-6 border-b border-cream-border pb-3 overflow-x-auto">
+                  {[
+                    { key: 'all', label: 'All Deposits', count: allDeposits.length },
+                    { key: 'completed', label: 'Completed', count: completedDeps.length },
+                    { key: 'pending', label: 'Pending', count: pendingDeps.length },
+                    { key: 'rejected', label: 'Rejected', count: rejectedDeps.length },
+                  ].map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setDepositFilter(tab.key as any)}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap flex items-center gap-2 ${
+                        depositFilter === tab.key
+                          ? 'bg-accent text-white font-semibold shadow-sm'
+                          : 'bg-cream-secondary text-text-secondary hover:text-text-primary'
+                      }`}
+                    >
+                      {tab.label}
+                      <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                        depositFilter === tab.key ? 'bg-white/20 text-white' : 'bg-black/10 text-text-secondary'
+                      }`}>
+                        {tab.count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {txLoading ? (
+                  <div className="flex justify-center py-10"><Loader2 className="animate-spin text-accent" size={28} /></div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-cream-border">
+                          {['User', 'Amount', 'Provider', 'Reference', 'Date', 'Status', 'Actions'].map(h => (
+                            <th key={h} className="text-left text-xs font-medium text-text-secondary uppercase tracking-wider pb-3 pr-4">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-cream-border">
+                        {displayedDeposits.map(tx => (
+                          <tr key={tx.id}>
+                            <td className="py-4 text-sm font-medium text-text-primary pr-4 whitespace-nowrap">
+                              {tx.profiles?.full_name || tx.profiles?.email || '—'}
+                            </td>
+                            <td className="py-4 text-sm font-semibold text-text-primary pr-4">{formatDualCurrency(tx.amount)}</td>
+                            <td className="py-4 text-sm text-text-secondary pr-4">{tx.provider || 'MarzPay'}</td>
+                            <td className="py-4 text-sm text-text-secondary pr-4 whitespace-nowrap font-mono text-xs">
+                              {tx.reference || '—'}
+                            </td>
+                            <td className="py-4 text-sm text-text-secondary pr-4 whitespace-nowrap">
+                              {new Date(tx.created_at).toLocaleDateString()} {new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </td>
+                            <td className="py-4 pr-4"><StatusBadge status={tx.status} /></td>
+                            <td className="py-4">
+                              {(tx.status === 'pending' || tx.status === 'pending_approval') && (
+                                <div className="flex items-center gap-2">
+                                  <button onClick={() => approveTransaction(tx.id, tx.type)} className="p-1.5 rounded-lg bg-status-success/10 text-status-success hover:bg-status-success/20" title="Approve Deposit">
+                                    <CheckCircle2 size={16} />
+                                  </button>
+                                  <button onClick={() => rejectTransaction(tx.id)} className="p-1.5 rounded-lg bg-status-error/10 text-status-error hover:bg-status-error/20" title="Reject Deposit">
+                                    <XCircle size={16} />
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                        {displayedDeposits.length === 0 && (
+                          <tr><td colSpan={7} className="py-10 text-center text-sm text-text-secondary">No deposits matching this filter</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* ── INVESTMENTS ── */}
         {activeTab === 'investments' && (
