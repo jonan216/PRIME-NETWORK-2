@@ -1,9 +1,9 @@
--- ==========================================
--- REFERRAL REGISTRATION BONUS MIGRATION
--- Run this in Supabase SQL Editor
--- ==========================================
+-- ==========================================================
+-- PRIME NETWORK - FIX REGISTRATION TRIGGER & REFERRAL BONUS
+-- Run this in Supabase SQL Editor to fix 500 registration error
+-- ==========================================================
 
--- 1. Create registration bonus function
+-- 1. Fix process_registration_bonus so it handles string referral codes gracefully
 CREATE OR REPLACE FUNCTION public.process_registration_bonus(p_user_id UUID)
 RETURNS VOID AS $$
 DECLARE
@@ -33,7 +33,7 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 2. Update trigger to call registration bonus safely
+-- 2. Fix handle_new_user_registration so auth.users insertion NEVER crashes
 CREATE OR REPLACE FUNCTION public.handle_new_user_registration()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -104,6 +104,12 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 3. Grant execute permission on the new function
+-- 3. Re-attach trigger to auth.users
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user_registration();
+
+-- 4. Grant permissions
 GRANT EXECUTE ON FUNCTION public.process_registration_bonus(UUID) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.handle_new_user_registration() TO authenticated, anon;
