@@ -496,14 +496,37 @@ marzRouter.post(['/webhook', '/'], async (req, res) => {
 
     let userId = event.user_id || event.customer_id || event.data?.user_id || event.metadata?.user_id || null
     const email = event.email || event.customer_email || event.data?.email || null
+    const phone = event.phone_number || event.phone || event.customer_phone || event.data?.phone_number || null
 
-    if (!reference && !userId && !email) {
+    if (!reference && !userId && !email && !phone) {
       return res.status(200).json({ received: true, note: 'payload missing identifiers' })
     }
 
-    // Attempt to locate matching user by email if userId not provided
+    // 1. Attempt to locate matching user by transaction reference
+    if (!userId && reference) {
+      const { data: refTx } = await supabaseAdmin
+        .from('transactions')
+        .select('user_id')
+        .eq('reference', reference)
+        .single()
+      if (refTx) userId = refTx.user_id
+    }
+
+    // 2. Attempt to locate matching user by email
     if (!userId && email) {
       const { data: userProfile } = await supabaseAdmin.from('profiles').select('id').eq('email', email.toLowerCase()).single()
+      if (userProfile) userId = userProfile.id
+    }
+
+    // 3. Attempt to locate matching user by phone number
+    if (!userId && phone) {
+      const cleanPhone = String(phone).replace(/\D/g, '')
+      const { data: userProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .or(`username.ilike.%${cleanPhone}%,full_name.ilike.%${cleanPhone}%`)
+        .limit(1)
+        .single()
       if (userProfile) userId = userProfile.id
     }
 
