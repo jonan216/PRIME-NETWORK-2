@@ -54,9 +54,9 @@ export default function WithdrawPage() {
       setLoading(false)
     }
     loadTransactions()
-  }, [profile?.id])
+  }, [profile?.id, profile?.balance])
 
-  const availableBalance = transactions.reduce((sum, tx) => {
+  const calculatedBalance = transactions.reduce((sum, tx) => {
     const amt = tx.amount || 0
     if (tx.type === 'deposit' && (tx.status === 'completed' || tx.status === 'approved')) return sum + amt
     if (tx.type === 'withdrawal' && (tx.status === 'completed' || tx.status === 'approved')) return sum - amt
@@ -66,6 +66,10 @@ export default function WithdrawPage() {
     if (tx.type === 'refund' && tx.status === 'completed') return sum + amt
     return sum
   }, 0)
+
+  const availableBalance = profile?.balance !== undefined && profile.balance !== null
+    ? Math.max(Number(profile.balance), calculatedBalance)
+    : calculatedBalance
 
   const recentWithdrawals: RecentWithdrawal[] = transactions
     .filter(tx => tx.type === 'withdrawal')

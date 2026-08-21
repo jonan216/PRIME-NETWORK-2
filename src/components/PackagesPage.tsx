@@ -55,9 +55,9 @@ export default function PackagesPage() {
     }
 
     loadPackages()
-  }, [profile?.id])
+  }, [profile?.id, profile?.balance])
 
-  const availableBalance = transactions.reduce((sum, tx) => {
+  const calculatedBalance = transactions.reduce((sum, tx) => {
     const amount = tx.amount || 0
     if (tx.type === 'deposit' && (tx.status === 'completed' || tx.status === 'approved')) return sum + amount
     if (tx.type === 'withdrawal' && (tx.status === 'completed' || tx.status === 'approved')) return sum - amount
@@ -67,6 +67,10 @@ export default function PackagesPage() {
     if (tx.type === 'refund' && tx.status === 'completed') return sum + amount
     return sum
   }, 0)
+
+  const availableBalance = profile?.balance !== undefined && profile.balance !== null
+    ? Math.max(Number(profile.balance), calculatedBalance)
+    : calculatedBalance
 
   const totalInvested = packages.reduce((sum, p) => sum + (p.amount || 0), 0)
   const activeCount = packages.filter(p => p.status === 'active').length
